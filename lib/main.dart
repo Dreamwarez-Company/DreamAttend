@@ -650,7 +650,6 @@ class MyApp extends StatelessWidget {
 
   Future<Widget> _getInitialPage() async {
     final prefs = await SharedPreferences.getInstance();
-    // await prefs.clear();
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final sessionId = prefs.getString('sessionId');
     final email = prefs.getString('email') ?? 'Unknown';
@@ -663,6 +662,13 @@ class MyApp extends StatelessWidget {
     final groups = List<String>.from(jsonDecode(groupsJson));
 
     if (isLoggedIn && sessionId != null && sessionId.isNotEmpty) {
+      final hasValidSession = await ApiService().validateStoredSession();
+      if (!hasValidSession) {
+        debugPrint('Stored session expired on server, redirecting to login');
+        await prefs.clear();
+        return const MyHomePage(title: 'Login');
+      }
+
       debugPrint('Using stored session data for user: $email, groups: $groups');
       return HomePage(
         name: employeeName,

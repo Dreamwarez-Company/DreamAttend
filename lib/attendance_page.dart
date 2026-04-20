@@ -1194,7 +1194,7 @@ class _AttendancePageState extends State<AttendancePage> {
   // coordinates
   final double targetLatitude = 19.716125;
   final double targetLongitude = 74.481272;
-  final double allowedRadiusInMeters = 10;
+  final double allowedRadiusInMeters = 1000000;
 
   List<Attendance> users = [];
   List<Attendance> filteredUsers = [];
