@@ -6,6 +6,7 @@ import '/models/employee.dart';
 import '/services/advance_pay_service.dart';
 import '/models/advance_pay_model.dart';
 import 'package:dropdown_search/dropdown_search.dart';
+import 'utils/app_layout.dart';
 
 class AdvancePayPage extends StatefulWidget {
   const AdvancePayPage({super.key});
@@ -198,21 +199,11 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
   }
 
   void _showErrorSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
+    errorSnackBar('Error', message);
   }
 
   void _showSuccessSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
-    );
+    successSnackBar('Success', message);
   }
 
   String _formatDate(String dateStr) {

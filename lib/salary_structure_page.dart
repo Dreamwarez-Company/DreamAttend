@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '/services/configuration_service.dart';
 import '/models/salary_structure.dart';
+import 'utils/app_layout.dart';
 
 class SalaryStructurePage extends StatefulWidget {
   final ConfigurationService configurationService;
@@ -36,12 +37,7 @@ class _SalaryStructurePageState extends State<SalaryStructurePage> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error fetching salary structures: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      errorSnackBar('Error', 'Error fetching salary structures: $e');
     }
   }
 

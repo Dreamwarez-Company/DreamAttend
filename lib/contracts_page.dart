@@ -5,6 +5,7 @@ import '/services/contract_service.dart';
 import '/models/employee.dart';
 import '/models/contract_model.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'utils/app_layout.dart';
 
 class ContractsPage extends StatefulWidget {
   final bool showDialogOnLoad;
@@ -64,9 +65,7 @@ class _ContractsPageState extends State<ContractsPage> {
         _employees = employees;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to fetch employees: $e')),
-      );
+      errorSnackBar('Error', 'Failed to fetch employees: $e');
     }
   }
 
@@ -81,29 +80,17 @@ class _ContractsPageState extends State<ContractsPage> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to fetch contracts: $e')),
-      );
+      errorSnackBar('Error', 'Failed to fetch contracts: $e');
     }
   }
 
   Future<void> _setContractRunning(int contractId) async {
     try {
       await _contractService.setContractRunning(contractId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to set contract to running state'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      successSnackBar('Success', 'Contract set to running state successfully');
       await _fetchContracts();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Contract set to running state successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      errorSnackBar('Error', 'Failed to set contract to running state: $e');
     }
   }
 
@@ -310,9 +297,7 @@ class _ContractsPageState extends State<ContractsPage> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to fetch contract details: $e')),
-      );
+      errorSnackBar('Error', 'Failed to fetch contract details: $e');
     }
   }
 
@@ -914,17 +899,9 @@ class _ContractsPageState extends State<ContractsPage> {
                           });
 
                           // Show success message
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Contract created successfully'),
-                              backgroundColor: Colors.green,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(10)),
-                              ),
-                              duration: Duration(seconds: 2),
-                            ),
+                          successSnackBar(
+                            'Success',
+                            'Contract created successfully',
                           );
 
                           // Navigate back to main screen
@@ -934,20 +911,9 @@ class _ContractsPageState extends State<ContractsPage> {
                           await _fetchContracts();
                         } catch (e) {
                           // Show error message with actual error details
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Contract created successfully'),
-
-                              // content: Text(
-                              //     'Failed to create contract: ${e.toString()}'),
-                              backgroundColor: Colors.green,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(10)),
-                              ),
-                              duration: Duration(seconds: 3),
-                            ),
+                          errorSnackBar(
+                            'Error',
+                            'Failed to create contract: ${e.toString()}',
                           );
                           Navigator.pop(context);
                         }

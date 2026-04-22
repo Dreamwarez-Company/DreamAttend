@@ -1254,6 +1254,7 @@ import '/services/payslip_service.dart';
 import '/models/employee.dart';
 import '/models/payslip.dart';
 import 'dart:developer' as developer;
+import 'utils/app_layout.dart';
 
 class PayslipPage extends StatefulWidget {
   const PayslipPage({super.key});
@@ -1408,14 +1409,7 @@ class _PayslipPageState extends State<PayslipPage> {
 
   void _showSnackBar(String msg, {Color color = Colors.green}) {
     developer.log('Showing SnackBar: $msg', name: 'PayslipPage');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: const TextStyle(color: Colors.white)),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
+    showStatusSnackBar(msg, color: color);
   }
 
   void _clearForm() {
@@ -2322,14 +2316,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
 
   void _showSnackBar(String msg, {Color color = Colors.red}) {
     developer.log('Showing SnackBar: $msg', name: 'PayslipDetailsPage');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: const TextStyle(color: Colors.white)),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
+    showStatusSnackBar(msg, color: color);
   }
 
   Widget _buildDetailRow(String label, String value) {

@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import '/models/employee.dart';
 import '/services/employee_service.dart';
+import 'widget/search_filter_bar.dart';
+import 'utils/app_layout.dart';
 
 class EmployeePage extends StatefulWidget {
   const EmployeePage({super.key});
@@ -75,12 +77,7 @@ class _EmployeePageState extends State<EmployeePage> {
         _filteredEmployees = employees;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load employees: ${e.toString()}'),
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      errorSnackBar('Error', 'Failed to load employees: ${e.toString()}');
     } finally {
       setState(() {
         _isLoading = false;
@@ -150,9 +147,7 @@ class _EmployeePageState extends State<EmployeePage> {
     try {
       await _employeeService.createEmployee(employeeData);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Employee created successfully!')),
-      );
+      successSnackBar('Success', 'Employee created successfully!');
       await _fetchEmployees();
       _formKey.currentState?.reset();
       setState(() {
@@ -170,9 +165,7 @@ class _EmployeePageState extends State<EmployeePage> {
         _showForm = false;
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      errorSnackBar('Error', 'Error: $e');
     }
   }
 
@@ -197,9 +190,7 @@ class _EmployeePageState extends State<EmployeePage> {
     try {
       await _employeeService.updateEmployee(employee.id, employeeData);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Employee updated successfully!')),
-      );
+      successSnackBar('Success', 'Employee updated successfully!');
       await _fetchEmployees();
       _formKey.currentState?.reset();
       setState(() {
@@ -217,9 +208,7 @@ class _EmployeePageState extends State<EmployeePage> {
         _showForm = false;
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      errorSnackBar('Error', 'Error: $e');
     }
   }
 
@@ -251,14 +240,10 @@ class _EmployeePageState extends State<EmployeePage> {
     if (confirm == true) {
       try {
         await _employeeService.archiveEmployee(employee.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${employee.name} deleted successfully!')),
-        );
+        successSnackBar('Success', '${employee.name} deleted successfully!');
         await _fetchEmployees();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        errorSnackBar('Error', 'Error: $e');
       }
     }
   }
@@ -754,28 +739,18 @@ class _EmployeePageState extends State<EmployeePage> {
               const SizedBox(height: 20),
             ],
             if (!_showForm) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search by Employee name or email',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchController.clear();
-                              _filterEmployees();
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
+              SearchFilterBar(
+                controller: _searchController,
+                hintText: 'Search by Employee name or email',
+                onChanged: _filterEmployees,
+                padding: const EdgeInsets.only(bottom: 16),
+                borderSide: const BorderSide(color: Colors.transparent),
+                enabledBorderSide: const BorderSide(
+                  color: Colors.transparent,
+                ),
+                focusedBorderSide: const BorderSide(
+                  color: Color(0xFF073850),
+                  width: 2,
                 ),
               ),
             ],

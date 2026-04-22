@@ -82,6 +82,34 @@ class TaskRequest {
     };
   }
 
+  TaskRequest copyWith({
+    int? taskId,
+    String? employeeId,
+    String? assignBy,
+    String? name,
+    String? startDate,
+    String? endDate,
+    String? deadline,
+    String? description,
+    String? state,
+    String? assignedToName,
+    String? assignedByName,
+  }) {
+    return TaskRequest(
+      taskId: taskId ?? this.taskId,
+      employeeId: employeeId ?? this.employeeId,
+      assignBy: assignBy ?? this.assignBy,
+      name: name ?? this.name,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      deadline: deadline ?? this.deadline,
+      description: description ?? this.description,
+      state: state ?? this.state,
+      assignedToName: assignedToName ?? this.assignedToName,
+      assignedByName: assignedByName ?? this.assignedByName,
+    );
+  }
+
   String get formattedStartDate => startDate ?? 'N/A';
   String get formattedEndDate => endDate ?? 'N/A';
   String get formattedDeadline => deadline.isNotEmpty ? deadline : 'N/A';

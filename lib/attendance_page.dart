@@ -1175,6 +1175,8 @@ import '/models/attendance.dart';
 import '/models/attendance_report.dart';
 import '/services/attendance_services.dart';
 import '/services/employee_service.dart';
+import 'widget/search_filter_bar.dart';
+import 'utils/app_layout.dart';
 
 class AttendancePage extends StatefulWidget {
   final bool isAdmin;
@@ -1271,60 +1273,10 @@ class _AttendancePageState extends State<AttendancePage> {
     required IconData icon,
     Duration duration = const Duration(seconds: 3),
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 1),
-            end: Offset.zero,
-          ).animate(
-            CurvedAnimation(
-              parent: ModalRoute.of(context)!.animation!,
-              curve: Curves.easeOutCubic,
-            ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [backgroundColor, backgroundColor.withOpacity(0.8)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Icon(icon, color: Colors.white, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    message,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        elevation: 0,
-        duration: duration,
-      ),
+    showStatusSnackBar(
+      message,
+      color: backgroundColor,
+      duration: duration,
     );
   }
 
@@ -1986,97 +1938,78 @@ class _AttendancePageState extends State<AttendancePage> {
                             ),
                           ],
                         ),
-                        child: TextField(
+                        child: SearchFilterBar(
                           controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: 'Search team members...',
-                            prefixIcon: const Icon(
-                              Icons.search,
-                              color: Colors.grey,
-                            ),
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_searchController.text.isNotEmpty)
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.clear,
-                                      color: Colors.grey,
-                                    ),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      _filterUsers();
-                                    },
-                                  ),
-                                if (_selectedDate != null)
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.close,
-                                      color: Colors.grey,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _selectedDate = null;
-                                      });
-                                      _filterUsers();
-                                    },
-                                  ),
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.calendar_today,
-                                    color: _selectedDate != null
-                                        ? Colors.blue
-                                        : Colors.grey,
-                                  ),
-                                  onPressed: () async {
-                                    final DateTime? picked =
-                                        await showDatePicker(
-                                      context: context,
-                                      initialDate:
-                                          _selectedDate ?? DateTime.now(),
-                                      firstDate: DateTime(2000),
-                                      lastDate: DateTime(2100),
-                                      builder: (BuildContext context,
-                                          Widget? child) {
-                                        return Theme(
-                                          data: ThemeData.light().copyWith(
-                                            colorScheme:
-                                                const ColorScheme.light(
-                                              primary: Color.fromARGB(
-                                                  255, 7, 56, 80),
-                                              onPrimary: Colors.white,
-                                            ),
-                                            textButtonTheme:
-                                                TextButtonThemeData(
-                                              style: TextButton.styleFrom(
-                                                foregroundColor: Colors
-                                                    .red, // Cancel button color
-                                              ),
-                                            ),
-                                          ),
-                                          child: child!,
-                                        );
-                                      },
-                                    );
-                                    if (picked != null &&
-                                        picked != _selectedDate) {
-                                      setState(() {
-                                        _selectedDate = picked;
-                                      });
-                                      _filterUsers();
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 14,
-                            ),
+                          hintText: 'Search team members...',
+                          onChanged: _filterUsers,
+                          padding: EdgeInsets.zero,
+                          iconColor: Colors.grey,
+                          borderSide: BorderSide.none,
+                          enabledBorderSide: BorderSide.none,
+                          focusedBorderSide: BorderSide.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 14,
                           ),
+                          fillColor: Colors.transparent,
+                          extraSuffixActions: [
+                            if (_selectedDate != null)
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.close,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedDate = null;
+                                  });
+                                  _filterUsers();
+                                },
+                              ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.calendar_today,
+                                color: _selectedDate != null
+                                    ? Colors.blue
+                                    : Colors.grey,
+                              ),
+                              onPressed: () async {
+                                final DateTime? picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _selectedDate ?? DateTime.now(),
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2100),
+                                  builder:
+                                      (BuildContext context, Widget? child) {
+                                    return Theme(
+                                      data: ThemeData.light().copyWith(
+                                        colorScheme: const ColorScheme.light(
+                                          primary: Color.fromARGB(
+                                            255,
+                                            7,
+                                            56,
+                                            80,
+                                          ),
+                                          onPrimary: Colors.white,
+                                        ),
+                                        textButtonTheme: TextButtonThemeData(
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: Colors.red,
+                                          ),
+                                        ),
+                                      ),
+                                      child: child!,
+                                    );
+                                  },
+                                );
+                                if (picked != null && picked != _selectedDate) {
+                                  setState(() {
+                                    _selectedDate = picked;
+                                  });
+                                  _filterUsers();
+                                }
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     const SizedBox(height: 20),

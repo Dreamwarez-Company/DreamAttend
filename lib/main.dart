@@ -638,7 +638,9 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'dart:convert';
+import 'package:get/get.dart';
 import 'register_page.dart';
+import 'utils/app_layout.dart';
 
 void main() {
   tz.initializeTimeZones();
@@ -688,7 +690,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Employee Attendance',
       theme: ThemeData(
@@ -778,10 +780,7 @@ class _MyHomePageState extends State<MyHomePage>
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreedToTnC) {
-      // Check if Terms and Conditions are agreed
-      ScaffoldMessenger.of(context).showSnackBar(
-        _buildSnackBar('Please agree to the Terms and Conditions', Colors.red),
-      );
+      errorSnackBar('Error', 'Please agree to the Terms and Conditions');
       return;
     }
 
@@ -813,10 +812,9 @@ class _MyHomePageState extends State<MyHomePage>
           userId: sessionData['user_id'].toString(),
         );
         if (groups.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            _buildSnackBar(
-                'Warning: Could not fetch user permissions. Limited access granted.',
-                Colors.orange),
+          warningSnackBar(
+            'Warning',
+            'Could not fetch user permissions. Limited access granted.',
           );
         }
       }
@@ -876,9 +874,7 @@ class _MyHomePageState extends State<MyHomePage>
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        _buildSnackBar('Login Successful!', Colors.green),
-      );
+      successSnackBar('Success', 'Login Successful!');
 
       Navigator.pushReplacement(
         context,
@@ -897,37 +893,12 @@ class _MyHomePageState extends State<MyHomePage>
     } catch (e) {
       String errorMessage = _mapError(e.toString());
       debugPrint('Login error: $errorMessage');
-      ScaffoldMessenger.of(context).showSnackBar(
-        _buildSnackBar(errorMessage, Colors.red),
-      );
+      errorSnackBar('Error', errorMessage);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  SnackBar _buildSnackBar(String message, Color color) {
-    return SnackBar(
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      duration: const Duration(seconds: 3),
-      content: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 13.0),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white),
-          ),
-        ),
-      ),
-    );
   }
 
   String _mapError(String error) {

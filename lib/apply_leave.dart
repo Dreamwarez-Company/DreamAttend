@@ -4,6 +4,8 @@ import '/models/leave_request.dart';
 import '/services/leave_service.dart';
 import '/services/employee_service.dart';
 import '/models/employee.dart';
+import 'widget/search_filter_bar.dart';
+import 'utils/app_layout.dart';
 
 class ApplyLeave extends StatefulWidget {
   final String userRole;
@@ -132,36 +134,11 @@ class _ApplyLeaveState extends State<ApplyLeave> {
 
   void _showResultDialog(String title, String message, bool isSuccess) {
     if (isSuccess) {
-      Color backgroundColor =
-          message.contains('rejected') ? Colors.red : Colors.green;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          duration: const Duration(seconds: 2),
-          content: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 30.0,
-                vertical: 14.0,
-              ),
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-        ),
-      );
+      if (message.contains('rejected')) {
+        errorSnackBar(title, message);
+      } else {
+        successSnackBar(title, message);
+      }
       Future.delayed(const Duration(seconds: 2), () {
         if (!mounted) return;
         _reasonController.clear();
@@ -963,60 +940,12 @@ class _ApplyLeaveState extends State<ApplyLeave> {
               children: [
                 if (widget.userRole == 'admin') _buildLeaveStats(),
                 if (_showFilter) _buildFilterUI(),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search by Employee name',
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        color: Color(0xFF073850),
-                      ),
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_searchController.text.isNotEmpty)
-                            IconButton(
-                              icon: const Icon(
-                                Icons.clear,
-                                color: Color(0xFF073850),
-                              ),
-                              onPressed: () {
-                                _searchController.clear();
-                                _filterRequests();
-                              },
-                            ),
-                          IconButton(
-                            icon: Icon(
-                              _showFilter
-                                  ? Icons.filter_list_off
-                                  : Icons.filter_list,
-                              color: const Color(0xFF073850),
-                            ),
-                            onPressed: _showFilterDialog,
-                          ),
-                        ],
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.black),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.black),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: Colors.black,
-                          width: 2,
-                        ),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                  ),
+                SearchFilterBar(
+                  controller: _searchController,
+                  hintText: 'Search by Employee name',
+                  onChanged: _filterRequests,
+                  showFilter: _showFilter,
+                  onFilterPressed: _showFilterDialog,
                 ),
                 _isFetching
                     ? const Expanded(

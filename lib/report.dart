@@ -7,6 +7,7 @@ import '/models/attendance.dart';
 import '/models/attendance_report.dart';
 import '/services/attendance_services.dart';
 import '/services/employee_service.dart';
+import 'utils/app_layout.dart';
 
 class UserReportPage extends StatefulWidget {
   final AttendanceReport attendanceReport;
@@ -36,60 +37,10 @@ class _UserReportPageState extends State<UserReportPage> {
     required IconData icon,
     Duration duration = const Duration(seconds: 3),
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 1),
-            end: Offset.zero,
-          ).animate(
-            CurvedAnimation(
-              parent: ModalRoute.of(context)!.animation!,
-              curve: Curves.easeOutCubic,
-            ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [backgroundColor, backgroundColor.withOpacity(0.8)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Icon(icon, color: Colors.white, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    message,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                      fontFamily: 'Roboto',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        elevation: 0,
-        duration: duration,
-      ),
+    showStatusSnackBar(
+      message,
+      color: backgroundColor,
+      duration: duration,
     );
   }
 

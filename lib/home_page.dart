@@ -9,6 +9,7 @@ import 'payroll.dart';
 import 'holidays.dart';
 import 'user_profile.dart';
 import 'employee_page.dart';
+import 'utils/app_layout.dart';
 
 /// Professional Color Palette
 class AppColors {
@@ -147,14 +148,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   void _showSnackBar(String message, Color backgroundColor) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: backgroundColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 4),
+    showStatusSnackBar(
+      message,
+      color: backgroundColor,
+      duration: const Duration(seconds: 4),
+    );
+  }
+
+  void _openUserProfile() {
+    _navigateToPage(
+      context,
+      UserProfile(
+        numericId: widget.numericId,
+        jobTitle: widget.jobTitle,
+        name: widget.name,
+        address: widget.address,
+        mobile: widget.mobile,
       ),
     );
   }
@@ -313,23 +322,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           margin: const EdgeInsets.only(right: 16),
           child: Material(
             color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                _navigateToPage(
-                  context,
-                  UserProfile(
-                    numericId: widget.numericId,
-                    employeeId: widget.employeeId,
-                    jobTitle: widget.jobTitle,
-                    name: widget.name,
-                    address: widget.address,
-                    mobile: widget.mobile,
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.all(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: _openUserProfile,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -364,140 +361,147 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           begin: const Offset(0, -0.5),
           end: Offset.zero,
         ).animate(_headerAnimation),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white,
-                Color(0xFFFCFCFC),
-              ],
-            ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _openUserProfile,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: AppColors.accentTeal.withOpacity(0.1),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accentTeal.withOpacity(0.08),
-                blurRadius: 25,
-                spreadRadius: 2,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.accentTeal,
-                      AppColors.accentTeal.withOpacity(0.8),
-                      AppColors.primaryBlue.withOpacity(0.9),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white,
+                    Color(0xFFFCFCFC),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.accentTeal.withOpacity(0.1),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accentTeal.withOpacity(0.08),
+                    blurRadius: 25,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 8),
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.accentTeal.withOpacity(0.4),
-                      blurRadius: 15,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    const Center(
-                      child: Icon(
-                        Icons.person_outline,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: AppColors.successGreen,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          _getTimeBasedGreeting(),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: AppColors.textLight,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          _getTimeBasedIcon(),
-                          color: AppColors.accentTeal,
-                          size: 18,
+              child: Row(
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.accentTeal,
+                          AppColors.accentTeal.withOpacity(0.8),
+                          AppColors.primaryBlue.withOpacity(0.9),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accentTeal.withOpacity(0.4),
+                          blurRadius: 15,
+                          offset: const Offset(0, 6),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.name,
-                      style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
-                        letterSpacing: -0.5,
-                        height: 1.1,
-                      ),
+                    child: Stack(
+                      children: [
+                        const Center(
+                          child: Icon(
+                            Icons.person_outline,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: AppColors.successGreen,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              _getTimeBasedGreeting(),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: AppColors.textLight,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              _getTimeBasedIcon(),
+                              color: AppColors.accentTeal,
+                              size: 18,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.name,
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textDark,
+                            letterSpacing: -0.5,
+                            height: 1.1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentTeal.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward_ios,
+                      color: AppColors.accentTeal,
+                      size: 16,
+                    ),
+                  ),
+                ],
               ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.accentTeal.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_ios,
-                  color: AppColors.accentTeal,
-                  size: 16,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

@@ -1,1747 +1,18 @@
-// import 'package:dream_attend/Services/user_profile_service.dart';
-// import 'package:dream_attend/models/user_profile_model.dart';
-// import 'package:flutter/material.dart';
-// import 'package:flutter/services.dart';
-// import 'package:image_picker/image_picker.dart';
-// import 'dart:io';
-// import 'dart:convert';
-// import 'controller/app_constants.dart';
-// import 'main.dart';
-// import 'package:shared_preferences/shared_preferences.dart';
-// import '/services/api_service.dart';
-
-// class UserProfile extends StatefulWidget {
-//   final String employeeId;
-//   final String name;
-//   final String address;
-//   final String mobile;
-//   final int numericId;
-//   final String jobTitle;
-
-//   const UserProfile({
-//     super.key,
-//     required this.employeeId,
-//     required this.name,
-//     required this.address,
-//     required this.mobile,
-//     required this.numericId,
-//     required this.jobTitle,
-//   });
-
-//   @override
-//   State<UserProfile> createState() => _UserProfileState();
-// }
-
-// class _UserProfileState extends State<UserProfile> {
-//   String _imagePath = 'assets/images/man.png';
-//   bool isEditing = false;
-//   File? _selectedImage;
-
-//   // Editable fields initialized with widget data
-//   late String _employeeId;
-//   late String _name;
-//   late String _address;
-//   late String _mobile;
-//   late String _jobTitle;
-
-//   final Color _primaryColor = const Color.fromARGB(255, 7, 56, 80);
-//   final Color _accentColor = const Color.fromARGB(255, 15, 1, 4);
-
-//   // Initialize UserProfileService and ApiService
-//   final UserProfileService _userProfileService = UserProfileService();
-//   final ApiService _apiService = ApiService();
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     // Initialize state with passed data
-//     _employeeId = widget.employeeId;
-//     _name = widget.name;
-//     _address = widget.address;
-//     _mobile = widget.mobile;
-//     _jobTitle = widget.jobTitle;
-
-//     // Load saved image first, then fetch profile to avoid overwriting
-//     _loadSavedImage();
-//     _loadEmployeeProfile();
-//   }
-
-//   Future<void> _loadSavedImage() async {
-//     final prefs = await SharedPreferences.getInstance();
-//     final savedImage = prefs.getString('profile_image_${widget.numericId}');
-//     if (savedImage != null && savedImage.isNotEmpty) {
-//       setState(() {
-//         _imagePath = savedImage; // Use saved base64 image
-//         _selectedImage = null;
-//       });
-//     }
-//   }
-
-//   Future<void> _loadEmployeeProfile() async {
-//     try {
-//       final employeeData = await _userProfileService.fetchEmployeeProfile();
-//       // Only update image if no local image is saved to avoid overwriting
-//       final prefs = await SharedPreferences.getInstance();
-//       final savedImage = prefs.getString('profile_image_${widget.numericId}');
-//       setState(() {
-//         _name = employeeData.name;
-//         _jobTitle = employeeData.jobTitle ?? _jobTitle;
-//         _mobile = employeeData.mobile ?? _mobile;
-//         _address = employeeData.address ?? _address;
-//         // Update image only if no local image exists and server provides one
-//         if (savedImage == null &&
-//             employeeData.image != null &&
-//             employeeData.image!.isNotEmpty) {
-//           _imagePath = employeeData.image!;
-//           _selectedImage = null;
-//           prefs.setString('profile_image_${widget.numericId}', _imagePath);
-//         }
-//       });
-//     } catch (e) {
-//       print('Error fetching employee profile: $e');
-//     }
-//   }
-
-//   Future<void> _pickImage(ImageSource source) async {
-//     final ImagePicker picker = ImagePicker();
-//     final XFile? image = await picker.pickImage(source: source);
-
-//     if (image != null) {
-//       setState(() {
-//         _selectedImage = File(image.path);
-//       });
-//     }
-//   }
-
-//   void _changePhoto() {
-//     showModalBottomSheet(
-//       context: context,
-//       backgroundColor: Colors.transparent,
-//       isScrollControlled: true,
-//       builder: (BuildContext context) {
-//         return Container(
-//           decoration: const BoxDecoration(
-//             color: Colors.white,
-//             borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-//           ),
-//           padding: const EdgeInsets.all(24),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             children: [
-//               Center(
-//                 child: Container(
-//                   width: 40,
-//                   height: 4,
-//                   decoration: BoxDecoration(
-//                     color: Colors.grey[300],
-//                     borderRadius: BorderRadius.circular(2),
-//                   ),
-//                 ),
-//               ),
-//               const SizedBox(height: 20),
-//               Text(
-//                 'Update Profile Photo',
-//                 style: TextStyle(
-//                   fontSize: 20,
-//                   fontWeight: FontWeight.w600,
-//                   color: _primaryColor,
-//                 ),
-//               ),
-//               const SizedBox(height: 24),
-//               Row(
-//                 children: [
-//                   Expanded(
-//                     child: _buildPhotoOption(
-//                       icon: Icons.camera_alt_outlined,
-//                       label: 'Camera',
-//                       onTap: () {
-//                         _pickImage(ImageSource.camera);
-//                         Navigator.pop(context);
-//                       },
-//                     ),
-//                   ),
-//                   const SizedBox(width: 16),
-//                   Expanded(
-//                     child: _buildPhotoOption(
-//                       icon: Icons.photo_library_outlined,
-//                       label: 'Gallery',
-//                       onTap: () {
-//                         _pickImage(ImageSource.gallery);
-//                         Navigator.pop(context);
-//                       },
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ],
-//           ),
-//         );
-//       },
-//     );
-//   }
-
-//   Widget _buildPhotoOption({
-//     required IconData icon,
-//     required String label,
-//     required VoidCallback onTap,
-//   }) {
-//     return InkWell(
-//       onTap: onTap,
-//       borderRadius: BorderRadius.circular(12),
-//       child: Container(
-//         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-//         decoration: BoxDecoration(
-//           border: Border.all(color: _primaryColor.withOpacity(0.2)),
-//           borderRadius: BorderRadius.circular(12),
-//           color: _primaryColor.withOpacity(0.05),
-//         ),
-//         child: Column(
-//           children: [
-//             Icon(icon, size: 32, color: _primaryColor),
-//             const SizedBox(height: 8),
-//             Text(
-//               label,
-//               style: TextStyle(
-//                 fontSize: 14,
-//                 fontWeight: FontWeight.w500,
-//                 color: _primaryColor,
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   void _editField(String title, String currentValue, Function(String) onSave) {
-//     TextEditingController controller = TextEditingController(
-//       text: currentValue,
-//     );
-
-//     showDialog(
-//       context: context,
-//       builder: (context) => Dialog(
-//         shape: RoundedRectangleBorder(
-//           borderRadius: BorderRadius.circular(16),
-//         ),
-//         elevation: 8,
-//         child: Padding(
-//           padding: const EdgeInsets.all(24),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             children: [
-//               Text(
-//                 'Edit $title',
-//                 style: TextStyle(
-//                   fontSize: 20,
-//                   fontWeight: FontWeight.w600,
-//                   color: _primaryColor,
-//                 ),
-//               ),
-//               const SizedBox(height: 20),
-//               TextField(
-//                 controller: controller,
-//                 decoration: InputDecoration(
-//                   labelText: title,
-//                   border: OutlineInputBorder(
-//                     borderRadius: BorderRadius.circular(12),
-//                     borderSide: BorderSide(color: Colors.grey[300]!),
-//                   ),
-//                   focusedBorder: OutlineInputBorder(
-//                     borderRadius: BorderRadius.circular(12),
-//                     borderSide: BorderSide(color: _primaryColor, width: 2),
-//                   ),
-//                   filled: true,
-//                   fillColor: Colors.grey[50],
-//                   contentPadding: const EdgeInsets.symmetric(
-//                     horizontal: 16,
-//                     vertical: 16,
-//                   ),
-//                 ),
-//                 keyboardType: title == 'Mobile'
-//                     ? TextInputType.number
-//                     : title == 'Email'
-//                         ? TextInputType.emailAddress
-//                         : TextInputType.text,
-//                 inputFormatters: title == 'Mobile'
-//                     ? [
-//                         FilteringTextInputFormatter.digitsOnly,
-//                         LengthLimitingTextInputFormatter(10),
-//                       ]
-//                     : [],
-//               ),
-//               const SizedBox(height: 24),
-//               Row(
-//                 mainAxisAlignment: MainAxisAlignment.end,
-//                 children: [
-//                   TextButton(
-//                     onPressed: () => Navigator.pop(context),
-//                     style: TextButton.styleFrom(
-//                       padding: const EdgeInsets.symmetric(
-//                         horizontal: 20,
-//                         vertical: 12,
-//                       ),
-//                     ),
-//                     child: Text(
-//                       'Cancel',
-//                       style: TextStyle(
-//                         color: Colors.grey[600],
-//                         fontSize: 16,
-//                       ),
-//                     ),
-//                   ),
-//                   const SizedBox(width: 12),
-//                   ElevatedButton(
-//                     style: ElevatedButton.styleFrom(
-//                       backgroundColor: _primaryColor,
-//                       foregroundColor: Colors.white,
-//                       shape: RoundedRectangleBorder(
-//                         borderRadius: BorderRadius.circular(12),
-//                       ),
-//                       padding: const EdgeInsets.symmetric(
-//                         horizontal: 24,
-//                         vertical: 12,
-//                       ),
-//                       elevation: 0,
-//                     ),
-//                     onPressed: () {
-//                       if (controller.text.trim().isEmpty) {
-//                         ScaffoldMessenger.of(context).showSnackBar(
-//                           SnackBar(
-//                             content: const Text('Field cannot be empty'),
-//                             backgroundColor: Colors.red[400],
-//                             behavior: SnackBarBehavior.floating,
-//                             shape: RoundedRectangleBorder(
-//                               borderRadius: BorderRadius.circular(10),
-//                             ),
-//                           ),
-//                         );
-//                       } else if (title == 'Mobile' &&
-//                           _validateMobile(controller.text) != null) {
-//                         ScaffoldMessenger.of(context).showSnackBar(
-//                           SnackBar(
-//                             content: Text(_validateMobile(controller.text)!),
-//                             backgroundColor: Colors.red[400],
-//                             behavior: SnackBarBehavior.floating,
-//                             shape: RoundedRectangleBorder(
-//                               borderRadius: BorderRadius.circular(10),
-//                             ),
-//                           ),
-//                         );
-//                       } else if (title == 'Email' &&
-//                           _validateEmail(controller.text) != null) {
-//                         ScaffoldMessenger.of(context).showSnackBar(
-//                           SnackBar(
-//                             content: Text(_validateEmail(controller.text)!),
-//                             backgroundColor: Colors.red[400],
-//                             behavior: SnackBarBehavior.floating,
-//                             shape: RoundedRectangleBorder(
-//                               borderRadius: BorderRadius.circular(10),
-//                             ),
-//                           ),
-//                         );
-//                       } else {
-//                         onSave(controller.text.trim());
-//                         Navigator.pop(context);
-//                       }
-//                     },
-//                     child: const Text(
-//                       'Save',
-//                       style:
-//                           TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-
-//   String? _validateMobile(String value) {
-//     if (value.length != 10) {
-//       return 'Mobile number must be exactly 10 digits';
-//     }
-//     if (!RegExp(r'^\d{10}$').hasMatch(value)) {
-//       return 'Mobile number must contain only digits';
-//     }
-//     return null;
-//   }
-
-//   String? _validateEmail(String value) {
-//     if (!value.toLowerCase().endsWith('@dreamwarez.in')) {
-//       return 'Email must end with @dreamwarez.in';
-//     }
-//     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-//       return 'Please enter a valid email address';
-//     }
-//     return null;
-//   }
-
-//   Future<void> _saveProfileChanges() async {
-//     try {
-//       // Convert image to base64 if selected
-//       String? imageBase64;
-//       if (_selectedImage != null) {
-//         final bytes = await _selectedImage!.readAsBytes();
-//         imageBase64 = base64Encode(bytes);
-//       }
-
-//       // Validate numericId
-//       if (widget.numericId <= 0) {
-//         throw Exception('Invalid employee ID');
-//       }
-
-//       final updateRequest = UpdateEmployeeRequest(
-//         employeeId: widget.numericId.toString(),
-//         jobTitle: _jobTitle.isEmpty ? null : _jobTitle,
-//         mobile: _mobile.isEmpty ? null : _mobile,
-//         address: _address.isEmpty ? null : _address,
-//         image: imageBase64,
-//       );
-
-//       // Log the request body for debugging
-//       print('Update request body: ${updateRequest.toJson()}');
-
-//       final response = await _userProfileService.updateEmployeeProfile(
-//         widget.numericId,
-//         updateRequest,
-//       );
-
-//       // Save the image locally if it was uploaded
-//       final prefs = await SharedPreferences.getInstance();
-//       if (imageBase64 != null) {
-//         await prefs.setString('profile_image_${widget.numericId}', imageBase64);
-//       } else if (response.image != null && response.image!.isNotEmpty) {
-//         await prefs.setString(
-//             'profile_image_${widget.numericId}', response.image!);
-//       }
-
-//       setState(() {
-//         _name = response.name;
-//         _jobTitle = response.jobTitle ?? _jobTitle;
-//         _mobile = response.mobile ?? _mobile;
-//         _address = response.address ?? _address;
-//         // Update image path based on local upload or server response
-//         if (imageBase64 != null) {
-//           _imagePath = imageBase64;
-//           _selectedImage = null;
-//         } else if (response.image != null && response.image!.isNotEmpty) {
-//           _imagePath = response.image!;
-//           _selectedImage = null;
-//         }
-//       });
-
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: const Text('Profile updated successfully'),
-//           backgroundColor: Colors.green[400],
-//           behavior: SnackBarBehavior.floating,
-//           shape: RoundedRectangleBorder(
-//             borderRadius: BorderRadius.circular(10),
-//           ),
-//         ),
-//       );
-//     } catch (e) {
-//       print('Error updating profile: $e'); // Log error for debugging
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: Text('Failed to update profile: $e'),
-//           backgroundColor: Colors.red[400],
-//           behavior: SnackBarBehavior.floating,
-//           shape: RoundedRectangleBorder(
-//             borderRadius: BorderRadius.circular(10),
-//           ),
-//         ),
-//       );
-//     }
-//   }
-
-//   Future<void> _logout() async {
-//     try {
-//       // Retrieve sessionId and playerId from SharedPreferences
-//       final prefs = await SharedPreferences.getInstance();
-//       final sessionId = prefs.getString('sessionId');
-//       final playerId =
-//           prefs.getString('player_id'); // Optional: retrieve player_id
-
-//       if (sessionId == null || sessionId.isEmpty) {
-//         throw Exception('No active session found');
-//       }
-
-//       // Prepare payload for logout API
-//       final payload = playerId != null && playerId.isNotEmpty
-//           ? {'player_id': playerId}
-//           : {};
-
-//       // Make authenticated POST request to /signout
-//       final response = await _apiService.authenticatedPost(
-//         AppConstants.signoutEndpoint,
-//         payload,
-//         sessionId: sessionId,
-//       );
-
-//       final responseData = jsonDecode(response.body);
-
-//       if (response.statusCode == 200 && responseData['status'] == 'SUCCESS') {
-//         // Clear all session data
-//         await _apiService.clearSessionData();
-
-//         // Navigate to MyApp and clear navigation stack
-//         Navigator.pushAndRemoveUntil(
-//           context,
-//           MaterialPageRoute(builder: (context) => const MyApp()),
-//           (Route<dynamic> route) => false,
-//         );
-
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(
-//             content: const Text('Logout successful'),
-//             backgroundColor: Colors.green[400],
-//             behavior: SnackBarBehavior.floating,
-//             shape: RoundedRectangleBorder(
-//               borderRadius: BorderRadius.circular(10),
-//             ),
-//           ),
-//         );
-//       } else {
-//         throw Exception(responseData['message'] ?? 'Logout failed');
-//       }
-//     } catch (e) {
-//       print('Error during logout: $e');
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: Text('Failed to logout: $e'),
-//           backgroundColor: Colors.red[400],
-//           behavior: SnackBarBehavior.floating,
-//           shape: RoundedRectangleBorder(
-//             borderRadius: BorderRadius.circular(10),
-//           ),
-//         ),
-//       );
-//     }
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: Colors.grey[50],
-//       appBar: AppBar(
-//         title: const Text(
-//           'Profile',
-//           style: TextStyle(
-//             fontWeight: FontWeight.w600,
-//             fontSize: 18,
-//             color: Colors.white,
-//           ),
-//         ),
-//         backgroundColor: _primaryColor,
-//         elevation: 0,
-//         centerTitle: true,
-//         iconTheme: const IconThemeData(color: Colors.white),
-//         actions: [
-//           PopupMenuButton<String>(
-//             icon: const Icon(Icons.more_vert, color: Colors.white),
-//             shape: RoundedRectangleBorder(
-//               borderRadius: BorderRadius.circular(12),
-//             ),
-//             onSelected: (value) async {
-//               if (value == 'edit') {
-//                 setState(() {
-//                   isEditing = !isEditing;
-//                 });
-//               } else if (value == 'logout') {
-//                 await _logout();
-//               }
-//             },
-//             itemBuilder: (BuildContext context) => [
-//               PopupMenuItem(
-//                 value: 'edit',
-//                 child: Row(
-//                   children: [
-//                     Icon(
-//                       isEditing ? Icons.check : Icons.edit_outlined,
-//                       color: _primaryColor,
-//                       size: 20,
-//                     ),
-//                     const SizedBox(width: 12),
-//                     Text(
-//                       isEditing ? 'Done Editing' : 'Edit Profile',
-//                       style: const TextStyle(fontSize: 14),
-//                     ),
-//                   ],
-//                 ),
-//               ),
-//               const PopupMenuItem(
-//                 value: 'logout',
-//                 child: Row(
-//                   children: [
-//                     Icon(Icons.logout, color: Colors.red, size: 20),
-//                     SizedBox(width: 12),
-//                     Text('Logout', style: TextStyle(fontSize: 14)),
-//                   ],
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ],
-//       ),
-//       body: Column(
-//         children: [
-//           Container(
-//             width: double.infinity,
-//             decoration: BoxDecoration(
-//               color: _primaryColor,
-//               borderRadius: const BorderRadius.only(
-//                 bottomLeft: Radius.circular(30),
-//                 bottomRight: Radius.circular(30),
-//               ),
-//             ),
-//             child: Column(
-//               children: [
-//                 const SizedBox(height: 20),
-//                 GestureDetector(
-//                   onTap: isEditing ? _changePhoto : null,
-//                   child: Stack(
-//                     children: [
-//                       Container(
-//                         width: 120,
-//                         height: 120,
-//                         decoration: BoxDecoration(
-//                           shape: BoxShape.circle,
-//                           border: Border.all(color: Colors.white, width: 4),
-//                           boxShadow: [
-//                             BoxShadow(
-//                               color: Colors.black.withOpacity(0.15),
-//                               blurRadius: 15,
-//                               offset: const Offset(0, 5),
-//                             ),
-//                           ],
-//                         ),
-//                         child: CircleAvatar(
-//                           radius: 58,
-//                           backgroundImage: _selectedImage != null
-//                               ? FileImage(_selectedImage!)
-//                               : _imagePath.startsWith('assets/')
-//                                   ? AssetImage(_imagePath)
-//                                   : _imagePath.startsWith('http')
-//                                       ? NetworkImage(_imagePath)
-//                                       : MemoryImage(base64Decode(_imagePath))
-//                                           as ImageProvider,
-//                         ),
-//                       ),
-//                       if (isEditing)
-//                         Positioned(
-//                           bottom: 0,
-//                           right: 0,
-//                           child: Container(
-//                             padding: const EdgeInsets.all(8),
-//                             decoration: BoxDecoration(
-//                               color: Colors.white,
-//                               shape: BoxShape.circle,
-//                               boxShadow: [
-//                                 BoxShadow(
-//                                   color: Colors.black.withOpacity(0.1),
-//                                   blurRadius: 8,
-//                                 ),
-//                               ],
-//                             ),
-//                             child: Icon(
-//                               Icons.camera_alt,
-//                               color: _primaryColor,
-//                               size: 20,
-//                             ),
-//                           ),
-//                         ),
-//                     ],
-//                   ),
-//                 ),
-//                 const SizedBox(height: 16),
-//                 Text(
-//                   _name,
-//                   style: const TextStyle(
-//                     fontSize: 24,
-//                     fontWeight: FontWeight.w600,
-//                     color: Colors.white,
-//                   ),
-//                 ),
-//                 const SizedBox(height: 4),
-//                 const SizedBox(height: 30),
-//               ],
-//             ),
-//           ),
-
-//           // Content Section
-//           Expanded(
-//             child: SingleChildScrollView(
-//               padding: const EdgeInsets.all(20),
-//               child: Column(
-//                 children: [
-//                   // Profile Information Card
-//                   Container(
-//                     width: double.infinity,
-//                     decoration: BoxDecoration(
-//                       color: Colors.white,
-//                       borderRadius: BorderRadius.circular(16),
-//                       boxShadow: [
-//                         BoxShadow(
-//                           color: Colors.black.withOpacity(0.05),
-//                           blurRadius: 10,
-//                           offset: const Offset(0, 2),
-//                         ),
-//                       ],
-//                     ),
-//                     child: Column(
-//                       crossAxisAlignment: CrossAxisAlignment.start,
-//                       children: [
-//                         Padding(
-//                           padding: const EdgeInsets.all(20),
-//                           child: Text(
-//                             'Personal Information',
-//                             style: TextStyle(
-//                               fontSize: 18,
-//                               fontWeight: FontWeight.w600,
-//                               color: _primaryColor,
-//                             ),
-//                           ),
-//                         ),
-//                         _buildInfoItem(
-//                           icon: Icons.person_outline,
-//                           label: 'Full Name',
-//                           value: _name,
-//                           onEdit: isEditing
-//                               ? () => _editField('Name', _name, (value) {
-//                                     setState(() => _name = value);
-//                                   })
-//                               : null,
-//                         ),
-//                         const Divider(height: 1),
-//                         _buildInfoItem(
-//                           icon: Icons.work_outline,
-//                           label: 'Job Title',
-//                           value: _jobTitle,
-//                           onEdit: isEditing
-//                               ? () =>
-//                                   _editField('Job Title', _jobTitle, (value) {
-//                                     setState(() => _jobTitle = value);
-//                                   })
-//                               : null,
-//                         ),
-//                         const Divider(height: 1),
-//                         _buildInfoItem(
-//                           icon: Icons.phone_outlined,
-//                           label: 'Mobile Number',
-//                           value: _mobile,
-//                           onEdit: isEditing
-//                               ? () => _editField('Mobile', _mobile, (value) {
-//                                     setState(() => _mobile = value);
-//                                   })
-//                               : null,
-//                         ),
-//                         const Divider(height: 1),
-//                         _buildInfoItem(
-//                           icon: Icons.location_on_outlined,
-//                           label: 'Address',
-//                           value: _address,
-//                           onEdit: isEditing
-//                               ? () => _editField('Address', _address, (value) {
-//                                     setState(() => _address = value);
-//                                   })
-//                               : null,
-//                           isLast: true,
-//                         ),
-//                       ],
-//                     ),
-//                   ),
-
-//                   const SizedBox(height: 30),
-
-//                   // Save Button
-//                   if (isEditing)
-//                     SizedBox(
-//                       width: double.infinity,
-//                       child: ElevatedButton(
-//                         style: ElevatedButton.styleFrom(
-//                           backgroundColor: _primaryColor,
-//                           foregroundColor: Colors.white,
-//                           shape: RoundedRectangleBorder(
-//                             borderRadius: BorderRadius.circular(12),
-//                           ),
-//                           padding: const EdgeInsets.symmetric(vertical: 16),
-//                           elevation: 0,
-//                         ),
-//                         onPressed: () async {
-//                           setState(() {
-//                             isEditing = false;
-//                           });
-//                           await _saveProfileChanges();
-//                         },
-//                         child: const Text(
-//                           'Save Changes',
-//                           style: TextStyle(
-//                             fontSize: 16,
-//                             fontWeight: FontWeight.w600,
-//                           ),
-//                         ),
-//                       ),
-//                     ),
-//                 ],
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   Widget _buildInfoItem({
-//     required IconData icon,
-//     required String label,
-//     required String value,
-//     VoidCallback? onEdit,
-//     bool isLast = false,
-//   }) {
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-//       child: Row(
-//         children: [
-//           Container(
-//             padding: const EdgeInsets.all(8),
-//             decoration: BoxDecoration(
-//               color: _primaryColor.withOpacity(0.1),
-//               borderRadius: BorderRadius.circular(8),
-//             ),
-//             child: Icon(
-//               icon,
-//               color: _primaryColor,
-//               size: 20,
-//             ),
-//           ),
-//           const SizedBox(width: 16),
-//           Expanded(
-//             child: Column(
-//               crossAxisAlignment: CrossAxisAlignment.start,
-//               children: [
-//                 Text(
-//                   label,
-//                   style: TextStyle(
-//                     fontSize: 12,
-//                     color: Colors.grey[600],
-//                     fontWeight: FontWeight.w500,
-//                   ),
-//                 ),
-//                 const SizedBox(height: 4),
-//                 Text(
-//                   value,
-//                   style: const TextStyle(
-//                     fontSize: 16,
-//                     fontWeight: FontWeight.w500,
-//                     color: Colors.black87,
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//           if (onEdit != null)
-//             IconButton(
-//               icon: Icon(
-//                 Icons.edit_outlined,
-//                 color: _primaryColor,
-//                 size: 20,
-//               ),
-//               onPressed: onEdit,
-//               splashRadius: 20,
-//             ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
-// import 'package:dream_attend/Services/user_profile_service.dart';
-// import 'package:dream_attend/models/user_profile_model.dart';
-// import 'package:flutter/material.dart';
-// import 'package:flutter/services.dart';
-// import 'package:image_picker/image_picker.dart';
-// // import 'package:dw_attendance_app/services/user_profile_service.dart';
-// // import 'package:dw_attendance_app/models/user_profile_model.dart';
-// import 'dart:io';
-// import 'dart:convert';
-// import 'controller/app_constants.dart';
-// import 'main.dart';
-// import 'package:shared_preferences/shared_preferences.dart';
-// import '/services/api_service.dart';
-
-// class UserProfile extends StatefulWidget {
-//   final String employeeId;
-//   final String name;
-//   final String address;
-//   final String mobile;
-//   final int numericId;
-//   final String jobTitle;
-
-//   const UserProfile({
-//     super.key,
-//     required this.employeeId,
-//     required this.name,
-//     required this.address,
-//     required this.mobile,
-//     required this.numericId,
-//     required this.jobTitle,
-//   });
-
-//   @override
-//   State<UserProfile> createState() => _UserProfileState();
-// }
-
-// class _UserProfileState extends State<UserProfile> {
-//   String _imagePath = 'assets/images/default.png';
-//   bool isEditing = false;
-//   File? _selectedImage;
-
-//   // Editable fields initialized with widget data
-//   late String _employeeId;
-//   late String _name;
-//   late String _address;
-//   late String _mobile;
-//   late String _jobTitle;
-
-//   final Color _primaryColor = const Color.fromARGB(255, 7, 56, 80);
-//   final Color _accentColor = const Color.fromARGB(255, 15, 1, 4);
-
-//   // Initialize UserProfileService and ApiService
-//   final UserProfileService _userProfileService = UserProfileService();
-//   final ApiService _apiService = ApiService();
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     // Initialize state with passed data
-//     _employeeId = widget.employeeId;
-//     _name = widget.name;
-//     _address = widget.address;
-//     _mobile = widget.mobile;
-//     _jobTitle = widget.jobTitle;
-
-//     // Load saved image first, then fetch profile to avoid overwriting
-//     _loadSavedImage();
-//     _loadEmployeeProfile();
-//   }
-
-//   Future<void> _loadSavedImage() async {
-//     final prefs = await SharedPreferences.getInstance();
-//     final savedImage = prefs.getString('profile_image_${widget.numericId}');
-//     if (savedImage != null && savedImage.isNotEmpty) {
-//       setState(() {
-//         _imagePath = savedImage; // Use saved base64 image
-//         _selectedImage = null;
-//       });
-//     }
-//   }
-
-//   Future<void> _loadEmployeeProfile() async {
-//     try {
-//       final employeeData = await _userProfileService.fetchEmployeeProfile();
-//       // Only update image if no local image is saved to avoid overwriting
-//       final prefs = await SharedPreferences.getInstance();
-//       final savedImage = prefs.getString('profile_image_${widget.numericId}');
-//       setState(() {
-//         _name = employeeData.name;
-//         _jobTitle = employeeData.jobTitle ?? _jobTitle;
-//         _mobile = employeeData.mobile ?? _mobile;
-//         _address = employeeData.address ?? _address;
-//         // Update image only if no local image exists and server provides one
-//         if (savedImage == null &&
-//             employeeData.image != null &&
-//             employeeData.image!.isNotEmpty) {
-//           _imagePath = employeeData.image!;
-//           _selectedImage = null;
-//           prefs.setString('profile_image_${widget.numericId}', _imagePath);
-//         }
-//       });
-//     } catch (e) {
-//       print('Error fetching employee profile: $e');
-//     }
-//   }
-
-//   Future<void> _pickImage(ImageSource source) async {
-//     final ImagePicker picker = ImagePicker();
-//     final XFile? image = await picker.pickImage(source: source);
-
-//     if (image != null) {
-//       setState(() {
-//         _selectedImage = File(image.path);
-//       });
-//     }
-//   }
-
-//   void _changePhoto() {
-//     showModalBottomSheet(
-//       context: context,
-//       backgroundColor: Colors.transparent,
-//       isScrollControlled: true,
-//       builder: (BuildContext context) {
-//         return Container(
-//           decoration: const BoxDecoration(
-//             color: Colors.white,
-//             borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-//           ),
-//           padding: const EdgeInsets.all(24),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             children: [
-//               Center(
-//                 child: Container(
-//                   width: 40,
-//                   height: 4,
-//                   decoration: BoxDecoration(
-//                     color: Colors.grey[300],
-//                     borderRadius: BorderRadius.circular(2),
-//                   ),
-//                 ),
-//               ),
-//               const SizedBox(height: 20),
-//               Text(
-//                 'Update Profile Photo',
-//                 style: TextStyle(
-//                   fontSize: 20,
-//                   fontWeight: FontWeight.w600,
-//                   color: _primaryColor,
-//                 ),
-//               ),
-//               const SizedBox(height: 24),
-//               Row(
-//                 children: [
-//                   Expanded(
-//                     child: _buildPhotoOption(
-//                       icon: Icons.camera_alt_outlined,
-//                       label: 'Camera',
-//                       onTap: () {
-//                         _pickImage(ImageSource.camera);
-//                         Navigator.pop(context);
-//                       },
-//                     ),
-//                   ),
-//                   const SizedBox(width: 16),
-//                   Expanded(
-//                     child: _buildPhotoOption(
-//                       icon: Icons.photo_library_outlined,
-//                       label: 'Gallery',
-//                       onTap: () {
-//                         _pickImage(ImageSource.gallery);
-//                         Navigator.pop(context);
-//                       },
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ],
-//           ),
-//         );
-//       },
-//     );
-//   }
-
-//   Widget _buildPhotoOption({
-//     required IconData icon,
-//     required String label,
-//     required VoidCallback onTap,
-//   }) {
-//     return InkWell(
-//       onTap: onTap,
-//       borderRadius: BorderRadius.circular(12),
-//       child: Container(
-//         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-//         decoration: BoxDecoration(
-//           border: Border.all(color: _primaryColor.withOpacity(0.2)),
-//           borderRadius: BorderRadius.circular(12),
-//           color: _primaryColor.withOpacity(0.05),
-//         ),
-//         child: Column(
-//           children: [
-//             Icon(icon, size: 32, color: _primaryColor),
-//             const SizedBox(height: 8),
-//             Text(
-//               label,
-//               style: TextStyle(
-//                 fontSize: 14,
-//                 fontWeight: FontWeight.w500,
-//                 color: _primaryColor,
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   void _editField(String title, String currentValue, Function(String) onSave) {
-//     TextEditingController controller = TextEditingController(
-//       text: currentValue,
-//     );
-
-//     showDialog(
-//       context: context,
-//       builder: (context) => Dialog(
-//         shape: RoundedRectangleBorder(
-//           borderRadius: BorderRadius.circular(16),
-//         ),
-//         elevation: 8,
-//         child: Padding(
-//           padding: const EdgeInsets.all(24),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             children: [
-//               Text(
-//                 'Edit $title',
-//                 style: TextStyle(
-//                   fontSize: 20,
-//                   fontWeight: FontWeight.w600,
-//                   color: _primaryColor,
-//                 ),
-//               ),
-//               const SizedBox(height: 20),
-//               TextField(
-//                 controller: controller,
-//                 decoration: InputDecoration(
-//                   labelText: title,
-//                   border: OutlineInputBorder(
-//                     borderRadius: BorderRadius.circular(12),
-//                     borderSide: BorderSide(color: Colors.grey[300]!),
-//                   ),
-//                   focusedBorder: OutlineInputBorder(
-//                     borderRadius: BorderRadius.circular(12),
-//                     borderSide: BorderSide(color: _primaryColor, width: 2),
-//                   ),
-//                   filled: true,
-//                   fillColor: Colors.grey[50],
-//                   contentPadding: const EdgeInsets.symmetric(
-//                     horizontal: 16,
-//                     vertical: 16,
-//                   ),
-//                 ),
-//                 keyboardType: title == 'Mobile'
-//                     ? TextInputType.number
-//                     : title == 'Email'
-//                         ? TextInputType.emailAddress
-//                         : TextInputType.text,
-//                 inputFormatters: title == 'Mobile'
-//                     ? [
-//                         FilteringTextInputFormatter.digitsOnly,
-//                         LengthLimitingTextInputFormatter(10),
-//                       ]
-//                     : [],
-//               ),
-//               const SizedBox(height: 24),
-//               Row(
-//                 mainAxisAlignment: MainAxisAlignment.end,
-//                 children: [
-//                   TextButton(
-//                     onPressed: () => Navigator.pop(context),
-//                     style: TextButton.styleFrom(
-//                       padding: const EdgeInsets.symmetric(
-//                         horizontal: 20,
-//                         vertical: 12,
-//                       ),
-//                     ),
-//                     child: Text(
-//                       'Cancel',
-//                       style: TextStyle(
-//                         color: Colors.grey[600],
-//                         fontSize: 16,
-//                       ),
-//                     ),
-//                   ),
-//                   const SizedBox(width: 12),
-//                   ElevatedButton(
-//                     style: ElevatedButton.styleFrom(
-//                       backgroundColor: _primaryColor,
-//                       foregroundColor: Colors.white,
-//                       shape: RoundedRectangleBorder(
-//                         borderRadius: BorderRadius.circular(12),
-//                       ),
-//                       padding: const EdgeInsets.symmetric(
-//                         horizontal: 24,
-//                         vertical: 12,
-//                       ),
-//                       elevation: 0,
-//                     ),
-//                     onPressed: () {
-//                       if (controller.text.trim().isEmpty) {
-//                         ScaffoldMessenger.of(context).showSnackBar(
-//                           SnackBar(
-//                             content: const Text('Field cannot be empty'),
-//                             backgroundColor: Colors.red[400],
-//                             behavior: SnackBarBehavior.floating,
-//                             shape: RoundedRectangleBorder(
-//                               borderRadius: BorderRadius.circular(10),
-//                             ),
-//                           ),
-//                         );
-//                       } else if (title == 'Mobile' &&
-//                           _validateMobile(controller.text) != null) {
-//                         ScaffoldMessenger.of(context).showSnackBar(
-//                           SnackBar(
-//                             content: Text(_validateMobile(controller.text)!),
-//                             backgroundColor: Colors.red[400],
-//                             behavior: SnackBarBehavior.floating,
-//                             shape: RoundedRectangleBorder(
-//                               borderRadius: BorderRadius.circular(10),
-//                             ),
-//                           ),
-//                         );
-//                       } else if (title == 'Email' &&
-//                           _validateEmail(controller.text) != null) {
-//                         ScaffoldMessenger.of(context).showSnackBar(
-//                           SnackBar(
-//                             content: Text(_validateEmail(controller.text)!),
-//                             backgroundColor: Colors.red[400],
-//                             behavior: SnackBarBehavior.floating,
-//                             shape: RoundedRectangleBorder(
-//                               borderRadius: BorderRadius.circular(10),
-//                             ),
-//                           ),
-//                         );
-//                       } else {
-//                         onSave(controller.text.trim());
-//                         Navigator.pop(context);
-//                       }
-//                     },
-//                     child: const Text(
-//                       'Save',
-//                       style:
-//                           TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-
-//   String? _validateMobile(String value) {
-//     if (value.length != 10) {
-//       return 'Mobile number must be exactly 10 digits';
-//     }
-//     if (!RegExp(r'^\d{10}$').hasMatch(value)) {
-//       return 'Mobile number must contain only digits';
-//     }
-//     return null;
-//   }
-
-//   String? _validateEmail(String value) {
-//     if (!value.toLowerCase().endsWith('@dreamwarez.in')) {
-//       return 'Email must end with @dreamwarez.in';
-//     }
-//     if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-//       return 'Please enter a valid email address';
-//     }
-//     return null;
-//   }
-
-//   Future<void> _saveProfileChanges() async {
-//     try {
-//       // Convert image to base64 if selected
-//       String? imageBase64;
-//       if (_selectedImage != null) {
-//         final bytes = await _selectedImage!.readAsBytes();
-//         imageBase64 = base64Encode(bytes);
-//       }
-
-//       // Validate numericId
-//       if (widget.numericId <= 0) {
-//         throw Exception('Invalid employee ID');
-//       }
-
-//       final updateRequest = UpdateEmployeeRequest(
-//         employeeId: widget.numericId.toString(),
-//         jobTitle: _jobTitle.isEmpty ? null : _jobTitle,
-//         mobile: _mobile.isEmpty ? null : _mobile,
-//         address: _address.isEmpty ? null : _address,
-//         image: imageBase64,
-//       );
-
-//       // Log the request body for debugging
-//       print('Update request body: ${updateRequest.toJson()}');
-
-//       final response = await _userProfileService.updateEmployeeProfile(
-//         widget.numericId,
-//         updateRequest,
-//       );
-
-//       // Save the image locally if it was uploaded
-//       final prefs = await SharedPreferences.getInstance();
-//       if (imageBase64 != null) {
-//         await prefs.setString('profile_image_${widget.numericId}', imageBase64);
-//       } else if (response.image != null && response.image!.isNotEmpty) {
-//         await prefs.setString(
-//             'profile_image_${widget.numericId}', response.image!);
-//       }
-
-//       setState(() {
-//         _name = response.name;
-//         _jobTitle = response.jobTitle ?? _jobTitle;
-//         _mobile = response.mobile ?? _mobile;
-//         _address = response.address ?? _address;
-//         // Update image path based on local upload or server response
-//         if (imageBase64 != null) {
-//           _imagePath = imageBase64;
-//           _selectedImage = null;
-//         } else if (response.image != null && response.image!.isNotEmpty) {
-//           _imagePath = response.image!;
-//           _selectedImage = null;
-//         }
-//       });
-
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: const Text('Profile updated successfully'),
-//           backgroundColor: Colors.green[400],
-//           behavior: SnackBarBehavior.floating,
-//           shape: RoundedRectangleBorder(
-//             borderRadius: BorderRadius.circular(10),
-//           ),
-//         ),
-//       );
-//     } catch (e) {
-//       print('Error updating profile: $e'); // Log error for debugging
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: Text('Failed to update profile: $e'),
-//           backgroundColor: Colors.red[400],
-//           behavior: SnackBarBehavior.floating,
-//           shape: RoundedRectangleBorder(
-//             borderRadius: BorderRadius.circular(10),
-//           ),
-//         ),
-//       );
-//     }
-//   }
-
-//   Future<void> _logout() async {
-//     try {
-//       // Retrieve sessionId and playerId from SharedPreferences
-//       final prefs = await SharedPreferences.getInstance();
-//       final sessionId = prefs.getString('sessionId');
-//       final playerId =
-//           prefs.getString('player_id'); // Optional: retrieve player_id
-
-//       if (sessionId == null || sessionId.isEmpty) {
-//         throw Exception('No active session found');
-//       }
-
-//       // Prepare payload for logout API
-//       final payload = playerId != null && playerId.isNotEmpty
-//           ? {'player_id': playerId}
-//           : {};
-
-//       // Make authenticated POST request to /signout
-//       final response = await _apiService.authenticatedPost(
-//         AppConstants.signoutEndpoint,
-//         payload,
-//         sessionId: sessionId,
-//       );
-
-//       final responseData = jsonDecode(response.body);
-
-//       if (response.statusCode == 200 && responseData['status'] == 'SUCCESS') {
-//         // Clear all session data
-//         await _apiService.clearSessionData();
-
-//         // Navigate to MyApp and clear navigation stack
-//         Navigator.pushAndRemoveUntil(
-//           context,
-//           MaterialPageRoute(builder: (context) => const MyApp()),
-//           (Route<dynamic> route) => false,
-//         );
-
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(
-//             content: const Text('Logout successful'),
-//             backgroundColor: Colors.green[400],
-//             behavior: SnackBarBehavior.floating,
-//             shape: RoundedRectangleBorder(
-//               borderRadius: BorderRadius.circular(10),
-//             ),
-//           ),
-//         );
-//       } else {
-//         throw Exception(responseData['message'] ?? 'Logout failed');
-//       }
-//     } catch (e) {
-//       print('Error during logout: $e');
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: Text('Failed to logout: $e'),
-//           backgroundColor: Colors.red[400],
-//           behavior: SnackBarBehavior.floating,
-//           shape: RoundedRectangleBorder(
-//             borderRadius: BorderRadius.circular(10),
-//           ),
-//         ),
-//       );
-//     }
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: Colors.grey[50],
-//       appBar: AppBar(
-//         title: const Text(
-//           'Profile',
-//           style: TextStyle(
-//             fontWeight: FontWeight.w600,
-//             fontSize: 18,
-//             color: Colors.white,
-//           ),
-//         ),
-//         backgroundColor: _primaryColor,
-//         elevation: 0,
-//         centerTitle: true,
-//         iconTheme: const IconThemeData(color: Colors.white),
-//         actions: [
-//           PopupMenuButton<String>(
-//             icon: const Icon(Icons.more_vert, color: Colors.white),
-//             shape: RoundedRectangleBorder(
-//               borderRadius: BorderRadius.circular(12),
-//             ),
-//             onSelected: (value) async {
-//               if (value == 'edit') {
-//                 setState(() {
-//                   isEditing = !isEditing;
-//                 });
-//               } else if (value == 'logout') {
-//                 await _logout();
-//               }
-//             },
-//             itemBuilder: (BuildContext context) => [
-//               PopupMenuItem(
-//                 value: 'edit',
-//                 child: Row(
-//                   children: [
-//                     Icon(
-//                       isEditing ? Icons.check : Icons.edit_outlined,
-//                       color: _primaryColor,
-//                       size: 20,
-//                     ),
-//                     const SizedBox(width: 12),
-//                     Text(
-//                       isEditing ? 'Done Editing' : 'Edit Profile',
-//                       style: const TextStyle(fontSize: 14),
-//                     ),
-//                   ],
-//                 ),
-//               ),
-//               const PopupMenuItem(
-//                 value: 'logout',
-//                 child: Row(
-//                   children: [
-//                     Icon(Icons.logout, color: Colors.red, size: 20),
-//                     SizedBox(width: 12),
-//                     Text('Logout', style: TextStyle(fontSize: 14)),
-//                   ],
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ],
-//       ),
-//       body: Column(
-//         children: [
-//           Container(
-//             width: double.infinity,
-//             decoration: BoxDecoration(
-//               color: _primaryColor,
-//               borderRadius: const BorderRadius.only(
-//                 bottomLeft: Radius.circular(30),
-//                 bottomRight: Radius.circular(30),
-//               ),
-//             ),
-//             child: Column(
-//               children: [
-//                 const SizedBox(height: 20),
-//                 GestureDetector(
-//                   onTap: isEditing ? _changePhoto : null,
-//                   child: Stack(
-//                     children: [
-//                       Container(
-//                         width: 120,
-//                         height: 120,
-//                         decoration: BoxDecoration(
-//                           shape: BoxShape.circle,
-//                           border: Border.all(color: Colors.white, width: 4),
-//                           boxShadow: [
-//                             BoxShadow(
-//                               color: Colors.black.withOpacity(0.15),
-//                               blurRadius: 15,
-//                               offset: const Offset(0, 5),
-//                             ),
-//                           ],
-//                         ),
-//                         child: CircleAvatar(
-//                           radius: 58,
-//                           backgroundImage: _selectedImage != null
-//                               ? FileImage(_selectedImage!)
-//                               : _imagePath.startsWith('assets/')
-//                                   ? AssetImage(_imagePath)
-//                                   : _imagePath.startsWith('http')
-//                                       ? NetworkImage(_imagePath)
-//                                       : MemoryImage(base64Decode(_imagePath))
-//                                           as ImageProvider,
-//                         ),
-//                       ),
-//                       if (isEditing)
-//                         Positioned(
-//                           bottom: 0,
-//                           right: 0,
-//                           child: Container(
-//                             padding: const EdgeInsets.all(8),
-//                             decoration: BoxDecoration(
-//                               color: Colors.white,
-//                               shape: BoxShape.circle,
-//                               boxShadow: [
-//                                 BoxShadow(
-//                                   color: Colors.black.withOpacity(0.1),
-//                                   blurRadius: 8,
-//                                 ),
-//                               ],
-//                             ),
-//                             child: Icon(
-//                               Icons.camera_alt,
-//                               color: _primaryColor,
-//                               size: 20,
-//                             ),
-//                           ),
-//                         ),
-//                     ],
-//                   ),
-//                 ),
-//                 const SizedBox(height: 16),
-//                 Text(
-//                   _name,
-//                   style: const TextStyle(
-//                     fontSize: 24,
-//                     fontWeight: FontWeight.w600,
-//                     color: Colors.white,
-//                   ),
-//                 ),
-//                 const SizedBox(height: 4),
-//                 const SizedBox(height: 30),
-//               ],
-//             ),
-//           ),
-
-//           // Content Section
-//           Expanded(
-//             child: SingleChildScrollView(
-//               padding: const EdgeInsets.all(20),
-//               child: Column(
-//                 children: [
-//                   // Profile Information Card
-//                   Container(
-//                     width: double.infinity,
-//                     decoration: BoxDecoration(
-//                       color: Colors.white,
-//                       borderRadius: BorderRadius.circular(16),
-//                       boxShadow: [
-//                         BoxShadow(
-//                           color: Colors.black.withOpacity(0.05),
-//                           blurRadius: 10,
-//                           offset: const Offset(0, 2),
-//                         ),
-//                       ],
-//                     ),
-//                     child: Column(
-//                       crossAxisAlignment: CrossAxisAlignment.start,
-//                       children: [
-//                         Padding(
-//                           padding: const EdgeInsets.all(20),
-//                           child: Text(
-//                             'Personal Information',
-//                             style: TextStyle(
-//                               fontSize: 18,
-//                               fontWeight: FontWeight.w600,
-//                               color: _primaryColor,
-//                             ),
-//                           ),
-//                         ),
-//                         _buildInfoItem(
-//                           icon: Icons.person_outline,
-//                           label: 'Full Name',
-//                           value: _name,
-//                           onEdit:
-//                               null, // Disable edit option for the name field
-//                         ),
-//                         const Divider(height: 1),
-//                         _buildInfoItem(
-//                           icon: Icons.work_outline,
-//                           label: 'Job Title',
-//                           value: _jobTitle,
-//                           onEdit: isEditing
-//                               ? () =>
-//                                   _editField('Job Title', _jobTitle, (value) {
-//                                     setState(() => _jobTitle = value);
-//                                   })
-//                               : null,
-//                         ),
-//                         const Divider(height: 1),
-//                         _buildInfoItem(
-//                           icon: Icons.phone_outlined,
-//                           label: 'Mobile Number',
-//                           value: _mobile,
-//                           onEdit: isEditing
-//                               ? () => _editField('Mobile', _mobile, (value) {
-//                                     setState(() => _mobile = value);
-//                                   })
-//                               : null,
-//                         ),
-//                         const Divider(height: 1),
-//                         _buildInfoItem(
-//                           icon: Icons.location_on_outlined,
-//                           label: 'Address',
-//                           value: _address,
-//                           onEdit: isEditing
-//                               ? () => _editField('Address', _address, (value) {
-//                                     setState(() => _address = value);
-//                                   })
-//                               : null,
-//                           isLast: true,
-//                         ),
-//                       ],
-//                     ),
-//                   ),
-
-//                   const SizedBox(height: 30),
-
-//                   // Save Button
-//                   if (isEditing)
-//                     SizedBox(
-//                       width: double.infinity,
-//                       child: ElevatedButton(
-//                         style: ElevatedButton.styleFrom(
-//                           backgroundColor: _primaryColor,
-//                           foregroundColor: Colors.white,
-//                           shape: RoundedRectangleBorder(
-//                             borderRadius: BorderRadius.circular(12),
-//                           ),
-//                           padding: const EdgeInsets.symmetric(vertical: 16),
-//                           elevation: 0,
-//                         ),
-//                         onPressed: () async {
-//                           setState(() {
-//                             isEditing = false;
-//                           });
-//                           await _saveProfileChanges();
-//                         },
-//                         child: const Text(
-//                           'Save Changes',
-//                           style: TextStyle(
-//                             fontSize: 16,
-//                             fontWeight: FontWeight.w600,
-//                           ),
-//                         ),
-//                       ),
-//                     ),
-//                 ],
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   Widget _buildInfoItem({
-//     required IconData icon,
-//     required String label,
-//     required String value,
-//     VoidCallback? onEdit,
-//     bool isLast = false,
-//   }) {
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-//       child: Row(
-//         children: [
-//           Container(
-//             padding: const EdgeInsets.all(8),
-//             decoration: BoxDecoration(
-//               color: _primaryColor.withOpacity(0.1),
-//               borderRadius: BorderRadius.circular(8),
-//             ),
-//             child: Icon(
-//               icon,
-//               color: _primaryColor,
-//               size: 20,
-//             ),
-//           ),
-//           const SizedBox(width: 16),
-//           Expanded(
-//             child: Column(
-//               crossAxisAlignment: CrossAxisAlignment.start,
-//               children: [
-//                 Text(
-//                   label,
-//                   style: TextStyle(
-//                     fontSize: 12,
-//                     color: Colors.grey[600],
-//                     fontWeight: FontWeight.w500,
-//                   ),
-//                 ),
-//                 const SizedBox(height: 4),
-//                 Text(
-//                   value,
-//                   style: const TextStyle(
-//                     fontSize: 16,
-//                     fontWeight: FontWeight.w500,
-//                     color: Colors.black87,
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//           if (onEdit != null)
-//             IconButton(
-//               icon: Icon(
-//                 Icons.edit_outlined,
-//                 color: _primaryColor,
-//                 size: 20,
-//               ),
-//               onPressed: onEdit,
-//               splashRadius: 20,
-//             ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-// ignore_for_file: use_build_context_synchronously
-
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:dream_attend/Services/user_profile_service.dart';
 import 'package:dream_attend/models/user_profile_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'controller/app_constants.dart';
+import 'main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../controller/app_constants.dart';
-import '../main.dart';
-import '../services/api_service.dart';
+import '/services/api_service.dart';
+import 'utils/app_layout.dart';
 
 class UserProfile extends StatefulWidget {
-  final String employeeId;
   final String name;
   final String address;
   final String mobile;
@@ -1750,7 +21,6 @@ class UserProfile extends StatefulWidget {
 
   const UserProfile({
     super.key,
-    required this.employeeId,
     required this.name,
     required this.address,
     required this.mobile,
@@ -1767,14 +37,12 @@ class _UserProfileState extends State<UserProfile> {
   bool isEditing = false;
   File? _selectedImage;
 
-  late String _employeeId;
   late String _name;
   late String _address;
   late String _mobile;
   late String _jobTitle;
 
   final Color _primaryColor = const Color.fromARGB(255, 7, 56, 80);
-  final Color _accentColor = const Color.fromARGB(255, 15, 1, 4);
 
   final UserProfileService _userProfileService = UserProfileService();
   final ApiService _apiService = ApiService();
@@ -1782,7 +50,6 @@ class _UserProfileState extends State<UserProfile> {
   @override
   void initState() {
     super.initState();
-    _employeeId = widget.employeeId;
     _name = widget.name;
     _address = widget.address;
     _mobile = widget.mobile;
@@ -1796,6 +63,7 @@ class _UserProfileState extends State<UserProfile> {
     final prefs = await SharedPreferences.getInstance();
     final savedImage = prefs.getString('profile_image_${widget.numericId}');
     if (savedImage != null && savedImage.isNotEmpty) {
+      if (!mounted) return;
       setState(() {
         _imagePath = savedImage;
         _selectedImage = null;
@@ -1809,6 +77,7 @@ class _UserProfileState extends State<UserProfile> {
       final prefs = await SharedPreferences.getInstance();
       final savedImage = prefs.getString('profile_image_${widget.numericId}');
 
+      if (!mounted) return;
       setState(() {
         _name = employeeData.name;
         _jobTitle = employeeData.jobTitle ?? _jobTitle;
@@ -1833,6 +102,7 @@ class _UserProfileState extends State<UserProfile> {
     final XFile? image = await picker.pickImage(source: source);
 
     if (image != null) {
+      if (!mounted) return;
       setState(() {
         _selectedImage = File(image.path);
       });
@@ -1987,9 +257,7 @@ class _UserProfileState extends State<UserProfile> {
                 ),
                 keyboardType: title == 'Mobile'
                     ? TextInputType.number
-                    : title == 'Email'
-                        ? TextInputType.emailAddress
-                        : TextInputType.text,
+                    : TextInputType.text,
                 inputFormatters: title == 'Mobile'
                     ? [
                         FilteringTextInputFormatter.digitsOnly,
@@ -2098,6 +366,7 @@ class _UserProfileState extends State<UserProfile> {
             'profile_image_${widget.numericId}', response.image!);
       }
 
+      if (!mounted) return;
       setState(() {
         _name = response.name;
         _jobTitle = response.jobTitle ?? _jobTitle;
@@ -2162,22 +431,8 @@ class _UserProfileState extends State<UserProfile> {
       if (response.statusCode == 200 && responseData['status'] == 'SUCCESS') {
         await _apiService.clearSessionData();
 
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const MyApp()),
-          (Route<dynamic> route) => false,
-        );
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Logout successful'),
-            backgroundColor: Colors.green[400],
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+        Get.offAll(() => const MyHomePage(title: 'Login'));
+        successSnackBar('Success', 'Logout successful');
       } else {
         throw Exception(responseData['message'] ?? 'Logout failed');
       }
@@ -2231,7 +486,6 @@ class _UserProfileState extends State<UserProfile> {
     try {
       await _userProfileService.archiveAccount();
 
-      // Clear all session data
       await _apiService.clearSessionData();
 
       Navigator.pushAndRemoveUntil(
@@ -2268,7 +522,7 @@ class _UserProfileState extends State<UserProfile> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF1F6F9),
       appBar: AppBar(
         title: const Text(
           'Profile',
@@ -2278,7 +532,8 @@ class _UserProfileState extends State<UserProfile> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: _primaryColor,
+        backgroundColor: const Color(0xFF073850),
+        surfaceTintColor: const Color(0xFF073850),
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -2343,89 +598,95 @@ class _UserProfileState extends State<UserProfile> {
       ),
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: _primaryColor,
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(30),
-                bottomRight: Radius.circular(30),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            ),
-            child: Column(
-              children: [
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: isEditing ? _changePhoto : null,
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 4),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.15),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: CircleAvatar(
-                          radius: 58,
-                          backgroundImage: _selectedImage != null
-                              ? FileImage(_selectedImage!)
-                              : _imagePath.startsWith('assets/')
-                                  ? AssetImage(_imagePath)
-                                  : _imagePath.startsWith('http')
-                                      ? NetworkImage(_imagePath)
-                                      : MemoryImage(base64Decode(_imagePath))
-                                          as ImageProvider,
-                        ),
-                      ),
-                      if (isEditing)
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.camera_alt,
-                              color: _primaryColor,
-                              size: 20,
-                            ),
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: isEditing ? _changePhoto : null,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: _primaryColor, width: 4),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 15,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: CircleAvatar(
+                            radius: 58,
+                            backgroundImage: _selectedImage != null
+                                ? FileImage(_selectedImage!)
+                                : _imagePath.startsWith('assets/')
+                                    ? AssetImage(_imagePath)
+                                    : _imagePath.startsWith('http')
+                                        ? NetworkImage(_imagePath)
+                                        : MemoryImage(base64Decode(_imagePath))
+                                            as ImageProvider,
                           ),
                         ),
-                    ],
+                        if (isEditing)
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: _primaryColor,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _name,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                  const SizedBox(height: 16),
+                  Text(
+                    _name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF073850),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 30),
-              ],
+                ],
+              ),
             ),
           ),
 
-          // Content Section
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),

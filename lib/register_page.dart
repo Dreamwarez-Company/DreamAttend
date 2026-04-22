@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '/models/register_model.dart';
 import '/services/register_service.dart';
 import 'main.dart';
+import 'utils/app_layout.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -59,9 +60,7 @@ class _RegisterPageState extends State<RegisterPage> {
       if (!mounted) return;
 
       if (response.status == 'SUCCESS') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registration successful!')),
-        );
+        successSnackBar('Success', 'Registration successful!');
 
         // Navigate to main app
         Navigator.pushReplacement(
@@ -73,9 +72,7 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-      );
+      errorSnackBar('Error', e.toString());
     } finally {
       if (mounted) {
         setState(() {

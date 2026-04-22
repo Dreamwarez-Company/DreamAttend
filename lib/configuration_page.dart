@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '/models/salary_rule.dart';
 import '/services/configuration_service.dart';
 import 'salary_structure_page.dart';
+import 'utils/app_layout.dart';
 
 class ConfigurationPage extends StatefulWidget {
   const ConfigurationPage({super.key});
@@ -178,16 +179,7 @@ class _SalaryRulePageState extends State<SalaryRulePage> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error fetching salary rules: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      errorSnackBar('Error', 'Error fetching salary rules: $e');
     }
   }
 
