@@ -46,19 +46,94 @@ class Payslip {
     this.remainingAdvanceBalance = 0.0,
   });
 
+  Payslip copyWith({
+    int? id,
+    String? name,
+    String? number,
+    String? employeeName,
+    String? state,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    Map<String, dynamic>? employeeId,
+    Map<String, dynamic>? structId,
+    Map<String, dynamic>? contractId,
+    Map<String, dynamic>? companyId,
+    bool? paid,
+    String? note,
+    bool? creditNote,
+    Map<String, dynamic>? payslipRunId,
+    List<Map<String, dynamic>>? workedDaysLineIds,
+    List<Map<String, dynamic>>? inputLineIds,
+    List<Map<String, dynamic>>? lineIds,
+    double? advanceDeductionAmount,
+    double? totalAdvancePay,
+    double? remainingAdvanceBalance,
+  }) {
+    return Payslip(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      number: number ?? this.number,
+      employeeName: employeeName ?? this.employeeName,
+      state: state ?? this.state,
+      dateFrom: dateFrom ?? this.dateFrom,
+      dateTo: dateTo ?? this.dateTo,
+      employeeId: employeeId ?? this.employeeId,
+      structId: structId ?? this.structId,
+      contractId: contractId ?? this.contractId,
+      companyId: companyId ?? this.companyId,
+      paid: paid ?? this.paid,
+      note: note ?? this.note,
+      creditNote: creditNote ?? this.creditNote,
+      payslipRunId: payslipRunId ?? this.payslipRunId,
+      workedDaysLineIds: workedDaysLineIds ?? this.workedDaysLineIds,
+      inputLineIds: inputLineIds ?? this.inputLineIds,
+      lineIds: lineIds ?? this.lineIds,
+      advanceDeductionAmount:
+          advanceDeductionAmount ?? this.advanceDeductionAmount,
+      totalAdvancePay: totalAdvancePay ?? this.totalAdvancePay,
+      remainingAdvanceBalance:
+          remainingAdvanceBalance ?? this.remainingAdvanceBalance,
+    );
+  }
+
   factory Payslip.fromJson(Map<String, dynamic> json) {
     final advancePayDetails =
         json['advance_pay_details'] is Map<String, dynamic>
-            ? json['advance_pay_details']
+            ? Map<String, dynamic>.from(json['advance_pay_details'])
             : {};
+
+    Map<String, dynamic>? normalizeRelation(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        return Map<String, dynamic>.from(value);
+      }
+      if (value is int) {
+        return {'id': value};
+      }
+      return null;
+    }
+
+    final normalizedEmployeeId = normalizeRelation(json['employee_id']);
+    final normalizedStructId = normalizeRelation(json['struct_id']);
+    final normalizedContractId = normalizeRelation(json['contract_id']);
+    final normalizedCompanyId = normalizeRelation(json['company_id']);
+
+    double parseDouble(dynamic value) {
+      if (value is num) {
+        return value.toDouble();
+      }
+      if (value is String) {
+        return double.tryParse(value) ?? 0.0;
+      }
+      return 0.0;
+    }
 
     return Payslip(
       id: json['id'] ?? 0,
       name: json['name'] ?? '',
       number: json['number'] ?? '',
       employeeName: json['employee_name'] ??
-          (json['employee_id'] is Map<String, dynamic>
-              ? json['employee_id']['name'] ?? ''
+          (normalizedEmployeeId != null
+              ? normalizedEmployeeId['name'] ?? ''
               : ''),
       state: json['state'] ?? '',
       dateFrom: json['date_from'] != null && json['date_from'] is String
@@ -67,18 +142,10 @@ class Payslip {
       dateTo: json['date_to'] != null && json['date_to'] is String
           ? DateTime.tryParse(json['date_to'])
           : null,
-      employeeId: json['employee_id'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(json['employee_id'])
-          : null,
-      structId: json['struct_id'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(json['struct_id'])
-          : null,
-      contractId: json['contract_id'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(json['contract_id'])
-          : null,
-      companyId: json['company_id'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(json['company_id'])
-          : null,
+      employeeId: normalizedEmployeeId,
+      structId: normalizedStructId,
+      contractId: normalizedContractId,
+      companyId: normalizedCompanyId,
       paid: json['paid'] ?? false,
       note: json['note'] ?? '',
       creditNote: json['credit_note'] ?? false,
@@ -97,12 +164,17 @@ class Payslip {
           ? List<Map<String, dynamic>>.from(
               json['line_ids'].map((x) => Map<String, dynamic>.from(x)))
           : [],
-      advanceDeductionAmount:
-          (advancePayDetails['advance_deduction_amount'] ?? 0.0).toDouble(),
-      totalAdvancePay:
-          (advancePayDetails['total_advance_pay'] ?? 0.0).toDouble(),
-      remainingAdvanceBalance:
-          (advancePayDetails['remaining_advance_balance'] ?? 0.0).toDouble(),
+      advanceDeductionAmount: parseDouble(
+        advancePayDetails['advance_deduction_amount'] ??
+            json['advance_deduction_amount'],
+      ),
+      totalAdvancePay: parseDouble(
+        advancePayDetails['total_advance_pay'] ?? json['total_advance_pay'],
+      ),
+      remainingAdvanceBalance: parseDouble(
+        advancePayDetails['remaining_advance_balance'] ??
+            json['remaining_advance_balance'],
+      ),
     );
   }
 

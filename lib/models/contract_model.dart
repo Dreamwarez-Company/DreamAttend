@@ -1,6 +1,7 @@
 class Contract {
   final int id;
   final String name;
+  final int? employeeId;
   final String employeeName;
   final String state;
   final DateTime? dateStart;
@@ -21,6 +22,7 @@ class Contract {
   Contract({
     required this.id,
     required this.name,
+    this.employeeId,
     required this.employeeName,
     required this.state,
     this.dateStart,
@@ -44,6 +46,15 @@ class Contract {
     print('Raw employee_id from JSON: ${json['employee_id']}');
     print('Raw employee_name from JSON: ${json['employee_name']}');
 
+    int? employeeIdValue;
+    if (json['employee_id'] is List && json['employee_id'].length > 1) {
+      employeeIdValue = json['employee_id'][0] as int?;
+    } else if (json['employee_id'] is Map) {
+      employeeIdValue = json['employee_id']['id'] as int?;
+    } else if (json['employee_id'] is int) {
+      employeeIdValue = json['employee_id'] as int;
+    }
+
     String employeeNameValue = '';
     // Check employee_name first (from /api/hr_contracts/tree)
     if (json['employee_name'] != null && json['employee_name'] != false) {
@@ -62,6 +73,7 @@ class Contract {
     return Contract(
       id: json['id'],
       name: json['name'],
+      employeeId: employeeIdValue,
       employeeName: employeeNameValue,
       state: json['state'] ?? 'draft',
       dateStart: json['date_start'] != null && json['date_start'] != false

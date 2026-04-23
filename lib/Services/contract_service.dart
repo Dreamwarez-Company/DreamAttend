@@ -82,20 +82,38 @@ class ContractService {
         sessionId: _sessionId!,
       );
 
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body);
-        if (jsonData['status'] == 'success') {
-          return jsonData;
-        } else {
-          throw Exception(jsonData['message'] ?? 'Failed to create contract');
-        }
-      } else {
-        throw Exception(
-            'Failed to create contract: ${response.statusCode} - ${response.body}');
+      final jsonData = json.decode(response.body);
+      final normalizedData = _unwrapResult(jsonData);
+      final isSuccess = jsonData['status'] == 'success' ||
+          jsonData['success'] == true ||
+          normalizedData['status'] == 'success' ||
+          normalizedData['success'] == true;
+
+      if (response.statusCode == 200 && isSuccess) {
+        return normalizedData;
       }
+
+      throw Exception(
+        normalizedData['message'] ??
+            normalizedData['error'] ??
+            jsonData['message'] ??
+            jsonData['error'] ??
+            'Failed to create contract',
+      );
     } catch (e) {
       throw Exception('Error creating contract: $e');
     }
+  }
+
+  Map<String, dynamic> _unwrapResult(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      final result = data['result'];
+      if (result is Map<String, dynamic>) {
+        return result;
+      }
+      return data;
+    }
+    return {};
   }
 
   Future<void> setContractRunning(int contractId) async {
@@ -109,13 +127,24 @@ class ContractService {
     if (response.statusCode == 200) {
       try {
         final jsonData = json.decode(response.body);
-        if (jsonData['status'] == 'success') {
+        final normalizedData = _unwrapResult(jsonData);
+        final isSuccess = jsonData['status'] == 'success' ||
+            jsonData['success'] == true ||
+            normalizedData['status'] == 'success' ||
+            normalizedData['success'] == true;
+
+        if (isSuccess) {
           return;
-        } else {
-          throw Exception(
-              jsonData['message'] ?? 'Failed to set contract to running');
         }
-      } catch (e) {
+
+        throw Exception(
+          normalizedData['message'] ??
+              normalizedData['error'] ??
+              jsonData['message'] ??
+              jsonData['error'] ??
+              'Failed to set contract to running',
+        );
+      } on FormatException catch (e) {
         throw Exception('Invalid JSON response: ${e.toString()}');
       }
     } else {

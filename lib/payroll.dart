@@ -105,7 +105,7 @@ class _PayrollPageState extends State<PayrollPage> {
                     },
                   ),
                   const SizedBox(height: 20),
-                  _buildConfigDropdown(context),
+                  // _buildConfigDropdown(context),
                   AnimatedOpacity(
                     opacity: _showConfigOptions ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 300),
@@ -182,14 +182,7 @@ class _PayrollPageState extends State<PayrollPage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
-            blurRadius: 20,
-            spreadRadius: 5,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: [],
         border: Border.all(color: Colors.grey.shade200),
       ),
       padding: const EdgeInsets.all(24),

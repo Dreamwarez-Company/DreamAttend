@@ -515,32 +515,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         margin: const EdgeInsets.symmetric(horizontal: 20),
         child: const Row(
           children: [
-            // Expanded(
-            //   child: _buildStatCard(
-            //     icon: Icons.access_time,
-            //     title: 'Today',
-            //     subtitle: 'Check In',
-            //     color: AppColors.successGreen,
-            //   ),
-            // ),
+           
             SizedBox(width: 12),
-            // Expanded(
-            //   child: _buildStatCard(
-            //     icon: Icons.task_alt,
-            //     title: '5',
-            //     subtitle: 'Tasks',
-            //     color: AppColors.accentTeal,
-            //   ),
-            // ),
+        
             SizedBox(width: 12),
-            // Expanded(
-            //   child: _buildStatCard(
-            //     icon: Icons.calendar_month,
-            //     title: '2',
-            //     subtitle: 'Leaves',
-            //     color: AppColors.warningOrange,
-            //   ),
-            // ),
+            
           ],
         ),
       ),
@@ -608,51 +587,59 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ).animate(_gridAnimation),
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            AppColors.accentTeal,
-                            AppColors.primaryBlue,
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final availableWidth = constraints.maxWidth;
+              final cellWidth = (availableWidth - 16) / 2;
+              final childAspectRatio = cellWidth / 172;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                AppColors.accentTeal,
+                                AppColors.primaryBlue,
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Quick Access',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textDark,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Quick Access',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1.15,
-                children: _buildDashboardItems(context),
-              ),
-            ],
+                  ),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: childAspectRatio.clamp(0.82, 1.1),
+                    children: _buildDashboardItems(context),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),

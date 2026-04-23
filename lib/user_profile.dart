@@ -33,7 +33,7 @@ class UserProfile extends StatefulWidget {
 }
 
 class _UserProfileState extends State<UserProfile> {
-  String _imagePath = 'assets/images/man.png';
+  String _imagePath = 'assets/images/default.png';
   bool isEditing = false;
   File? _selectedImage;
 

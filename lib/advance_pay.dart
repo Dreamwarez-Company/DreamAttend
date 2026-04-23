@@ -62,11 +62,15 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
                   .toList();
             });
           } else {
-            setState(() {
-              _advancePayRecords = (response.data as List)
-                  .map((item) => AdvancePayData.fromJson(item))
-                  .toList();
-            });
+                      setState(() {
+            _advancePayRecords = (response.data as List)
+                .map((item) => AdvancePayData.fromJson(item))
+                .toList();
+
+            // 👉 ADD THIS LINE
+            _advancePayRecords.sort((a, b) =>
+                DateTime.parse(b.date).compareTo(DateTime.parse(a.date)));
+          });
           }
         } else {
           _showErrorSnackbar('Invalid response format: Expected a list');
@@ -93,20 +97,6 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
       setState(() => _isLoading = false);
     }
   }
-
-  // Future<void> _selectDate(BuildContext context) async {
-  //   final DateTime? picked = await showDatePicker(
-  //     context: context,
-  //     initialDate: DateTime.now(),
-  //     firstDate: DateTime(2000),
-  //     lastDate: DateTime(2100),
-  //   );
-  //   if (picked != null) {
-  //     setState(() {
-  //       _dateController.text = DateFormat('dd-MM-yyyy').format(picked);
-  //     });
-  //   }
-  // }
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -383,8 +373,6 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
                       String firstLetter = item.name.isNotEmpty
                           ? item.name[0].toUpperCase()
                           : '';
-
-                      // Add a header if this is the first item OR if the letter changed
                       bool showHeader = index == 0 ||
                           _employees[index - 1].name[0].toUpperCase() !=
                               firstLetter;
@@ -421,31 +409,6 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
                   validator: (value) =>
                       value == null ? 'Please select an employee' : null,
                 ),
-
-                // DropdownSearch<Employee>(
-                //   items: _employees,
-                //   itemAsString: (Employee e) => e.name,
-                //   selectedItem: _selectedEmployee,
-                //   onChanged: (value) =>
-                //       setState(() => _selectedEmployee = value),
-                //   popupProps: const PopupProps.menu(
-                //     showSearchBox: true,
-                //     searchFieldProps: TextFieldProps(
-                //       decoration: InputDecoration(
-                //         labelText: "Search employee",
-                //         border: OutlineInputBorder(),
-                //       ),
-                //     ),
-                //   ),
-                //   dropdownDecoratorProps: const DropDownDecoratorProps(
-                //     dropdownSearchDecoration: InputDecoration(
-                //       labelText: 'Employee',
-                //       border: OutlineInputBorder(),
-                //     ),
-                //   ),
-                //   validator: (value) =>
-                //       value == null ? 'Please select an employee' : null,
-                // ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _amountController,

@@ -44,6 +44,106 @@ class _EmployeePageState extends State<EmployeePage> {
   List<Employee> _filteredEmployees = [];
   bool _isLoading = false;
 
+  Uint8List? _decodeEmployeeImage(String? imageData) {
+    if (imageData == null || imageData.trim().isEmpty) {
+      return null;
+    }
+
+    try {
+      return base64Decode(imageData);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _buildEmployeeImagePreview(Employee employee) {
+    final imageBytes = _decodeEmployeeImage(employee.image);
+
+    if (imageBytes != null) {
+      return Center(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24.0),
+          child: Image.memory(
+            imageBytes,
+            height: 200,
+            width: 200,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildMissingProfilePlaceholder();
+            },
+          ),
+        ),
+      );
+    }
+
+    return _buildMissingProfilePlaceholder();
+  }
+
+  Widget _buildMissingProfilePlaceholder() {
+    return Center(
+      child: Container(
+        height: 200,
+        width: 200,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFFE8F1F5),
+              Color(0xFFD6E5EC),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+          border: Border.all(
+            color: const Color(0xFFB8CED8),
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.75),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.person_outline_rounded,
+                size: 54,
+                color: Color(0xFF073850),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'No Profile Image',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF073850),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'No profile image inserted',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF5D7682),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -282,18 +382,7 @@ class _EmployeePageState extends State<EmployeePage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (employee.image != null)
-                      Center(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16.0),
-                          child: Image.memory(
-                            base64Decode(employee.image!),
-                            height: 200,
-                            width: 200,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
+                    _buildEmployeeImagePreview(employee),
                     const SizedBox(height: 60),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,

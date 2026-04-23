@@ -20,6 +20,8 @@ class SessionExpiredException implements Exception {
 class ApiService {
   ApiService();
 
+  static const Duration _requestTimeout = Duration(seconds: 20);
+
   /// Clears all stored session data
   Future<void> clearSessionData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -48,7 +50,7 @@ class ApiService {
           'password': password,
           'device_id': deviceId,
         }),
-      );
+      ).timeout(_requestTimeout);
 
       final responseData = _decodeJsonMap(
         response,
@@ -157,12 +159,21 @@ class ApiService {
         sessionId: sessionId,
       );
 
-      final responseData = jsonDecode(response.body);
+      final responseData = _decodeJsonMap(
+        response,
+        fallbackMessage: 'Failed to register player ID',
+      );
+      final normalizedResult = _unwrapResult(responseData);
+      final isSuccess = normalizedResult['success'] == true;
 
-      if (response.statusCode != 200 || responseData['success'] != true) {
+      if (response.statusCode != 200 || !isSuccess) {
         debugPrint('Player ID registration failed: ${response.body}');
         throw Exception(
-            responseData['error'] ?? 'Failed to register player ID');
+          normalizedResult['error'] ??
+              normalizedResult['message'] ??
+              responseData['error'] ??
+              'Failed to register player ID',
+        );
       }
 
       debugPrint('Player ID registered successfully: $playerId');
@@ -263,7 +274,7 @@ class ApiService {
           'Cookie': sessionId,
         },
         body: jsonEncode(body),
-      );
+      ).timeout(_requestTimeout);
       return await _handleAuthenticatedResponse(response, endpoint: endpoint);
     } catch (e) {
       if (e is SessionExpiredException) {
@@ -291,7 +302,7 @@ class ApiService {
           'Accept': 'application/json',
           'Cookie': sessionId,
         },
-      );
+      ).timeout(_requestTimeout);
       return await _handleAuthenticatedResponse(response, endpoint: endpoint);
     } catch (e) {
       if (e is SessionExpiredException) {
@@ -353,5 +364,13 @@ class ApiService {
     }
 
     throw Exception(fallbackMessage);
+  }
+
+  Map<String, dynamic> _unwrapResult(Map<String, dynamic> responseData) {
+    final result = responseData['result'];
+    if (result is Map<String, dynamic>) {
+      return result;
+    }
+    return responseData;
   }
 }

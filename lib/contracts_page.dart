@@ -6,6 +6,7 @@ import '/models/employee.dart';
 import '/models/contract_model.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'utils/app_layout.dart';
+import 'widget/search_filter_bar.dart';
 
 class ContractsPage extends StatefulWidget {
   final bool showDialogOnLoad;
@@ -42,9 +43,42 @@ class _ContractsPageState extends State<ContractsPage> {
   final TextEditingController _overtimeRateController = TextEditingController();
   final TextEditingController _otherAllowanceController =
       TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   DateTime _focusedDay = DateTime.now();
   bool _isLoading = true;
+
+  List<Contract> get _filteredContracts {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return _contracts;
+    }
+
+    return _contracts
+        .where(
+          (contract) => contract.employeeName.toLowerCase().contains(query),
+        )
+        .toList();
+  }
+
+  String _normalizeEmployeeName(String? value) {
+    return (value ?? '').trim().toLowerCase();
+  }
+
+  bool _hasDuplicateContract(
+    List<Contract> contracts, {
+    required int? employeeId,
+    required String? employeeName,
+  }) {
+    final normalizedSelectedName = _normalizeEmployeeName(employeeName);
+
+    return contracts.any((contract) {
+      final matchesId = employeeId != null && contract.employeeId == employeeId;
+      final matchesName = normalizedSelectedName.isNotEmpty &&
+          _normalizeEmployeeName(contract.employeeName) == normalizedSelectedName;
+      return matchesId || matchesName;
+    });
+  }
 
   @override
   void initState() {
@@ -53,6 +87,7 @@ class _ContractsPageState extends State<ContractsPage> {
     _fetchContracts();
     if (widget.showDialogOnLoad) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         _showAddContractScreen();
       });
     }
@@ -61,10 +96,12 @@ class _ContractsPageState extends State<ContractsPage> {
   Future<void> _fetchEmployees() async {
     try {
       final employees = await _employeeService.getEmployees();
+      if (!mounted) return;
       setState(() {
         _employees = employees;
       });
     } catch (e) {
+      if (!mounted) return;
       errorSnackBar('Error', 'Failed to fetch employees: $e');
     }
   }
@@ -72,11 +109,13 @@ class _ContractsPageState extends State<ContractsPage> {
   Future<void> _fetchContracts() async {
     try {
       final contracts = await _contractService.getContracts();
+      if (!mounted) return;
       setState(() {
         _contracts = contracts;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -87,9 +126,11 @@ class _ContractsPageState extends State<ContractsPage> {
   Future<void> _setContractRunning(int contractId) async {
     try {
       await _contractService.setContractRunning(contractId);
+      if (!mounted) return;
       successSnackBar('Success', 'Contract set to running state successfully');
       await _fetchContracts();
     } catch (e) {
+      if (!mounted) return;
       errorSnackBar('Error', 'Failed to set contract to running state: $e');
     }
   }
@@ -297,6 +338,7 @@ class _ContractsPageState extends State<ContractsPage> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       errorSnackBar('Error', 'Failed to fetch contract details: $e');
     }
   }
@@ -498,6 +540,7 @@ class _ContractsPageState extends State<ContractsPage> {
               icon: const Icon(Icons.arrow_back),
               onPressed: () {
                 Navigator.pop(context);
+                if (!mounted) return;
                 setState(() {
                   _clearForm();
                 });
@@ -818,6 +861,7 @@ class _ContractsPageState extends State<ContractsPage> {
                   child: OutlinedButton(
                     onPressed: () {
                       Navigator.pop(context);
+                      if (!mounted) return;
                       setState(() {
                         _clearForm();
                       });
@@ -845,6 +889,26 @@ class _ContractsPageState extends State<ContractsPage> {
                     onPressed: () async {
                       if (_formKey.currentState!.validate()) {
                         try {
+                          final latestContracts =
+                              await _contractService.getContracts();
+                          if (!mounted) return;
+
+                          final alreadyExists = _hasDuplicateContract(
+                            latestContracts,
+                            employeeId: _selectedEmployeeId,
+                            employeeName: _selectedEmployee,
+                          );
+
+                          if (alreadyExists) {
+                            setState(() {
+                              _contracts = latestContracts;
+                            });
+                            errorSnackBar(
+                              'Error',
+                              'Contract already exists for this employee',
+                            );
+                            return;
+                          }
                           final contractData = {
                             'employee_id': _selectedEmployeeId,
                             'name': 'Contract for $_selectedEmployee',
@@ -889,28 +953,20 @@ class _ContractsPageState extends State<ContractsPage> {
                                     ? 2
                                     : 3,
                           };
-
-                          // Create contract first
                           await _contractService.createContract(contractData);
-
-                          // Clear form after successful creation
+                          if (!mounted) return;
                           setState(() {
                             _clearForm();
                           });
-
-                          // Show success message
                           successSnackBar(
                             'Success',
                             'Contract created successfully',
                           );
 
-                          // Navigate back to main screen
                           Navigator.pop(context);
-
-                          // Refresh contracts list after navigation
                           await _fetchContracts();
                         } catch (e) {
-                          // Show error message with actual error details
+                          if (!mounted) return;
                           errorSnackBar(
                             'Error',
                             'Failed to create contract: ${e.toString()}',
@@ -1063,6 +1119,7 @@ class _ContractsPageState extends State<ContractsPage> {
                           ElevatedButton(
                             onPressed: () {
                               if (tempSelectedDate != null) {
+                                if (!mounted) return;
                                 setState(() {
                                   if (isStartDate) {
                                     _selectedDate = tempSelectedDate;
@@ -1116,11 +1173,14 @@ class _ContractsPageState extends State<ContractsPage> {
     _medicalAllowanceController.dispose();
     _overtimeRateController.dispose();
     _otherAllowanceController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final filteredContracts = _filteredContracts;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Employee Contracts'),
@@ -1147,11 +1207,6 @@ class _ContractsPageState extends State<ContractsPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Image.asset(
-                        //   'assets/images/empty_contracts.png',
-                        //   width: 200,
-                        //   height: 200,
-                        // ),
                         SizedBox(height: 24),
                         Text(
                           'No Contracts Found',
@@ -1175,8 +1230,16 @@ class _ContractsPageState extends State<ContractsPage> {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      SearchFilterBar(
+                        controller: _searchController,
+                        hintText: 'Search by employee name',
+                        padding: const EdgeInsets.only(bottom: 16),
+                        onChanged: () {
+                          setState(() {});
+                        },
+                      ),
                       Text(
-                        'Active Contracts (${_contracts.length})',
+                        'Active Contracts (${filteredContracts.length})',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -1185,102 +1248,136 @@ class _ContractsPageState extends State<ContractsPage> {
                       ),
                       const SizedBox(height: 16),
                       Expanded(
-                        child: ListView.builder(
-                          itemCount: _contracts.length,
-                          itemBuilder: (context, index) {
-                            final contract = _contracts[index];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () => _showContractDetails(contract),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            contract.name,
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF073850),
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 12, vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: contract.state == 'draft'
-                                                  ? Colors.orange[50]
-                                                  : Colors.green[50],
-                                              borderRadius:
-                                                  BorderRadius.circular(16),
-                                              border: Border.all(
-                                                color: contract.state == 'draft'
-                                                    ? Colors.orange
-                                                    : Colors.green,
-                                                width: 1,
-                                              ),
-                                            ),
-                                            child: Text(
-                                              contract.state == 'draft'
-                                                  ? 'NEW'
-                                                  : contract.state == 'open'
-                                                      ? 'RUNNING'
-                                                      : contract.state
-                                                          .toUpperCase(),
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: contract.state == 'draft'
-                                                    ? Colors.orange[800]
-                                                    : Colors.green[800],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        contract.employeeName,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Row(
-                                        children: [
-                                          _buildContractDate(
-                                            icon: Icons.calendar_today_outlined,
-                                            label: 'Start',
-                                            date: contract.dateStart,
-                                          ),
-                                          const SizedBox(width: 24),
-                                          _buildContractDate(
-                                            icon: Icons.calendar_today_outlined,
-                                            label: 'End',
-                                            date: contract.dateEnd,
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                        child: filteredContracts.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No contracts match this employee',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
                                   ),
                                 ),
+                              )
+                            : ListView.builder(
+                                itemCount: filteredContracts.length,
+                                itemBuilder: (context, index) {
+                                  final contract = filteredContracts[index];
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(12),
+                                      onTap: () => _showContractDetails(contract),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16.0),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    contract.name,
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 18,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Color(0xFF073850),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Flexible(
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 6,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: contract.state ==
+                                                              'draft'
+                                                          ? Colors.orange[50]
+                                                          : Colors.green[50],
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                        16,
+                                                      ),
+                                                      border: Border.all(
+                                                        color: contract.state ==
+                                                                'draft'
+                                                            ? Colors.orange
+                                                            : Colors.green,
+                                                        width: 1,
+                                                      ),
+                                                    ),
+                                                    child: Text(
+                                                      contract.state == 'draft'
+                                                          ? 'NEW'
+                                                          : contract.state ==
+                                                                  'open'
+                                                              ? 'RUNNING'
+                                                              : contract.state
+                                                                  .toUpperCase(),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: contract.state ==
+                                                                'draft'
+                                                            ? Colors.orange[800]
+                                                            : Colors.green[800],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              contract.employeeName,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Row(
+                                              children: [
+                                                _buildContractDate(
+                                                  icon: Icons
+                                                      .calendar_today_outlined,
+                                                  label: 'Start',
+                                                  date: contract.dateStart,
+                                                ),
+                                                const SizedBox(width: 24),
+                                                _buildContractDate(
+                                                  icon: Icons
+                                                      .calendar_today_outlined,
+                                                  label: 'End',
+                                                  date: contract.dateEnd,
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            );
-                          },
-                        ),
                       ),
                     ],
                   ),
