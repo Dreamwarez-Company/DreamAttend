@@ -301,16 +301,7 @@ class _UserProfileState extends State<UserProfile> {
                     ),
                     onPressed: () {
                       if (controller.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Field cannot be empty'),
-                            backgroundColor: Colors.red[400],
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        );
+                         showAppSnackBar(title: "Validation",message: "Field cannot be empty",type: AppSnackBarType.warning,);
                       } else {
                         onSave(controller.text.trim());
                         Navigator.pop(context);
@@ -381,28 +372,12 @@ class _UserProfileState extends State<UserProfile> {
         }
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Profile updated successfully'),
-          backgroundColor: Colors.green[400],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      showAppSnackBar(message: "Profile updated successfully",type: AppSnackBarType.success,);
+      
     } catch (e) {
       print('Error updating profile: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to update profile: $e'),
-          backgroundColor: Colors.red[400],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      showAppSnackBar(message: "Unable to update profile. Please try again.",type: AppSnackBarType.error,);
+      
     }
   }
 
@@ -431,23 +406,18 @@ class _UserProfileState extends State<UserProfile> {
       if (response.statusCode == 200 && responseData['status'] == 'SUCCESS') {
         await _apiService.clearSessionData();
 
+              showAppSnackBar(
+          message: "Logout successful",
+          type: AppSnackBarType.success,
+        );
+
         Get.offAll(() => const MyHomePage(title: 'Login'));
-        successSnackBar('Success', 'Logout successful');
       } else {
         throw Exception(responseData['message'] ?? 'Logout failed');
       }
     } catch (e) {
       print('Error during logout: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to logout: $e'),
-          backgroundColor: Colors.red[400],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      showAppSnackBar(message: "Unable to logout. Please try again.",type: AppSnackBarType.error,);
     }
   }
 
@@ -494,28 +464,17 @@ class _UserProfileState extends State<UserProfile> {
         (route) => false,
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account deleted successfully'),
-          backgroundColor: Color.fromARGB(255, 134, 9, 9),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              // borderRadius: BorderRadius.circular(10),
-              ),
-        ),
-      );
+     showAppSnackBar(
+  message: "Account deleted successfully",
+  type: AppSnackBarType.success,
+);
     } catch (e) {
       print('delete error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete account: $e'),
-          backgroundColor: Colors.red[400],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+    
+    showAppSnackBar(
+  message: "Failed to delete account",
+  type: AppSnackBarType.error,
+);
     }
   }
 
@@ -686,7 +645,6 @@ class _UserProfileState extends State<UserProfile> {
               ),
             ),
           ),
-
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),

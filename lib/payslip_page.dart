@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -8,6 +7,7 @@ import '/models/employee.dart';
 import '/models/payslip.dart';
 import 'dart:developer' as developer;
 import 'utils/app_layout.dart';
+import 'widget/search_filter_bar.dart';
 
 class PayslipPage extends StatefulWidget {
   const PayslipPage({super.key});
@@ -33,6 +33,8 @@ class _PayslipPageState extends State<PayslipPage> {
       TextEditingController();
   final TextEditingController _advanceDeductionController =
       TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
   final _formKey = GlobalKey<FormState>();
   DateTime _focusedDay = DateTime.now();
   bool _isFormOpen = false;
@@ -52,9 +54,13 @@ class _PayslipPageState extends State<PayslipPage> {
     try {
       developer.log('Fetching employees', name: 'PayslipPage');
       final employees = await _employeeService.getEmployees();
-      setState(() {
-        _employees = employees;
-      });
+      // setState(() {
+      //   _employees = employees;
+      // });
+              if (!mounted) return;
+        setState(() {
+          _employees = employees;
+        });
       developer.log(
           'Employees fetched successfully, count: ${employees.length}',
           name: 'PayslipPage');
@@ -213,13 +219,7 @@ class _PayslipPageState extends State<PayslipPage> {
           name: 'PayslipPage',
         );
 
-        final computedLines =
-            await _payslipService.computePayslipSheet(newPayslip.id);
-        developer.log(
-          'Payslip sheet computed: ID=${newPayslip.id}, Lines=${computedLines.length}',
-          name: 'PayslipPage',
-        );
-
+        // Do NOT auto-compute — user must click Compute Sheet in the details page
         final createdPayslip = Payslip(
           id: newPayslip.id,
           name: newPayslip.name,
@@ -238,7 +238,7 @@ class _PayslipPageState extends State<PayslipPage> {
           payslipRunId: newPayslip.payslipRunId,
           workedDaysLineIds: newPayslip.workedDaysLineIds,
           inputLineIds: newPayslip.inputLineIds,
-          lineIds: computedLines,
+          lineIds: const [], // empty until user clicks Compute Sheet
           advanceDeductionAmount: newPayslip.advanceDeductionAmount,
           totalAdvancePay: newPayslip.totalAdvancePay,
           remainingAdvanceBalance: newPayslip.remainingAdvanceBalance,
@@ -261,8 +261,7 @@ class _PayslipPageState extends State<PayslipPage> {
 
         developer.log('Payslip added to list and form cleared',
             name: 'PayslipPage');
-        _showSnackBar('Payslip created successfully',
-            color: Colors.green);
+        _showSnackBar('Payslip created successfully', color: Colors.green);
       } catch (e) {
         developer.log('Error creating payslip: $e',
             name: 'PayslipPage', error: e);
@@ -289,8 +288,8 @@ class _PayslipPageState extends State<PayslipPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return Dialog(
-              shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Container(
                 padding: const EdgeInsets.all(20),
                 constraints: const BoxConstraints(maxWidth: 400),
@@ -385,7 +384,8 @@ class _PayslipPageState extends State<PayslipPage> {
                             Navigator.pop(context);
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color.fromARGB(255, 7, 56, 80),
+                            backgroundColor:
+                                const Color.fromARGB(255, 7, 56, 80),
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -488,6 +488,7 @@ class _PayslipPageState extends State<PayslipPage> {
     _dateToController.dispose();
     _salaryStructureController.dispose();
     _advanceDeductionController.dispose();
+    _searchController.dispose();
     super.dispose();
     developer.log('PayslipPage disposed', name: 'PayslipPage');
   }
@@ -631,7 +632,6 @@ class _PayslipPageState extends State<PayslipPage> {
                                 TextButton(
                                   onPressed: () {
                                     _clearForm();
-                                    Navigator.pop(context);
                                   },
                                   child: const Text(
                                     'Cancel',
@@ -665,274 +665,346 @@ class _PayslipPageState extends State<PayslipPage> {
                     ),
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: _fetchPayslips,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _payslips.length,
-                    itemBuilder: (context, index) {
-                      final p = _payslips[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                        child: ExpansionTile(
-                          title: Text(
-                            p.employeeName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Color.fromARGB(255, 7, 56, 80),
-                            ),
-                          ),
-                          subtitle: Text(
-                            '${DateFormat('MMM dd, yyyy').format(p.dateFrom!)} - ${DateFormat('MMM dd, yyyy').format(p.dateTo!)}',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                          trailing: Chip(
-                            label: Text(
-                              p.state.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            backgroundColor: p.state == 'done'
-                                ? Colors.green
-                                : p.state == 'draft'
-                                    ? Colors.orange
-                                    : Colors.blue,
-                          ),
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildDetailRow('Payslip Number', p.number),
-                                  _buildDetailRow('State', p.state),
-                                  _buildDetailRow(
-                                      'Note', p.note.isEmpty ? 'N/A' : p.note),
-                                  _buildDetailRow(
-                                      'Paid', p.paid ? 'Yes' : 'No'),
-                                  _buildDetailRow('Credit Note',
-                                      p.creditNote ? 'Yes' : 'No'),
-                                  _buildDetailRow('Advance Deduction',
-                                      '₹${p.advanceDeductionAmount.toStringAsFixed(2)}'),
-                                  _buildDetailRow('Total Advance Pay',
-                                      '₹${p.totalAdvancePay.toStringAsFixed(2)}'),
-                                  _buildDetailRow('Remaining Advance Balance',
-                                      '₹${p.remainingAdvanceBalance.toStringAsFixed(2)}'),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      await _fetchPayslipDetails(p.id);
-                                      final detailedP = _detailedPayslips[p.id];
-                                      if (detailedP != null) {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                PayslipDetailsPage(
-                                              payslip: detailedP,
-                                              onCompute: (newLines) {
-                                                setState(() {
-                                                  _payslips =
-                                                      _payslips.map((payslip) {
-                                                    if (payslip.id == p.id) {
-                                                      return Payslip(
-                                                        id: payslip.id,
-                                                        name: payslip.name,
-                                                        number: payslip.number,
-                                                        employeeName: payslip
-                                                            .employeeName,
-                                                        state: payslip.state,
-                                                        dateFrom:
-                                                            payslip.dateFrom,
-                                                        dateTo: payslip.dateTo,
-                                                        employeeId:
-                                                            payslip.employeeId,
-                                                        structId:
-                                                            payslip.structId,
-                                                        contractId:
-                                                            payslip.contractId,
-                                                        companyId:
-                                                            payslip.companyId,
-                                                        paid: payslip.paid,
-                                                        note: payslip.note,
-                                                        creditNote:
-                                                            payslip.creditNote,
-                                                        payslipRunId: payslip
-                                                            .payslipRunId,
-                                                        workedDaysLineIds: payslip
-                                                            .workedDaysLineIds,
-                                                        inputLineIds: payslip
-                                                            .inputLineIds,
-                                                        lineIds: newLines,
-                                                        advanceDeductionAmount:
-                                                            payslip
-                                                                .advanceDeductionAmount,
-                                                        totalAdvancePay: payslip
-                                                            .totalAdvancePay,
-                                                        remainingAdvanceBalance:
-                                                            payslip
-                                                                .remainingAdvanceBalance,
-                                                      );
-                                                    }
-                                                    return payslip;
-                                                  }).toList();
-                                                  _detailedPayslips[p.id] =
-                                                      Payslip(
-                                                    id: p.id,
-                                                    name: p.name,
-                                                    number: p.number,
-                                                    employeeName:
-                                                        p.employeeName,
-                                                    state: p.state,
-                                                    dateFrom: p.dateFrom,
-                                                    dateTo: p.dateTo,
-                                                    employeeId: p.employeeId,
-                                                    structId: p.structId,
-                                                    contractId: p.contractId,
-                                                    companyId: p.companyId,
-                                                    paid: p.paid,
-                                                    note: p.note,
-                                                    creditNote: p.creditNote,
-                                                    payslipRunId:
-                                                        p.payslipRunId,
-                                                    workedDaysLineIds:
-                                                        p.workedDaysLineIds,
-                                                    inputLineIds:
-                                                        p.inputLineIds,
-                                                    lineIds: newLines,
-                                                    advanceDeductionAmount: p
-                                                        .advanceDeductionAmount,
-                                                    totalAdvancePay:
-                                                        p.totalAdvancePay,
-                                                    remainingAdvanceBalance: p
-                                                        .remainingAdvanceBalance,
-                                                  );
-                                                });
-                                                developer.log(
-                                                  'Updated payslip lines for ID: ${p.id}, New lines: ${newLines.length}',
-                                                  name: 'PayslipPage',
-                                                );
-                                              },
-                                              onConfirm: () {
-                                                setState(() {
-                                                  _payslips = _payslips
-                                                      .map((payslip) => payslip
-                                                                  .id ==
-                                                              p.id
-                                                          ? Payslip(
-                                                              id: payslip.id,
-                                                              name:
-                                                                  payslip.name,
-                                                              number: payslip
-                                                                  .number,
-                                                              employeeName: payslip
-                                                                  .employeeName,
-                                                              state: 'Done',
-                                                              dateFrom: payslip
-                                                                  .dateFrom,
-                                                              dateTo: payslip
-                                                                  .dateTo,
-                                                              employeeId: payslip
-                                                                  .employeeId,
-                                                              structId: payslip
-                                                                  .structId,
-                                                              contractId: payslip
-                                                                  .contractId,
-                                                              companyId: payslip
-                                                                  .companyId,
-                                                              paid:
-                                                                  payslip.paid,
-                                                              note:
-                                                                  payslip.note,
-                                                              creditNote: payslip
-                                                                  .creditNote,
-                                                              payslipRunId: payslip
-                                                                  .payslipRunId,
-                                                              workedDaysLineIds:
-                                                                  payslip
-                                                                      .workedDaysLineIds,
-                                                              inputLineIds: payslip
-                                                                  .inputLineIds,
-                                                              lineIds: payslip
-                                                                  .lineIds,
-                                                              advanceDeductionAmount:
-                                                                  payslip
-                                                                      .advanceDeductionAmount,
-                                                              totalAdvancePay:
-                                                                  payslip
-                                                                      .totalAdvancePay,
-                                                              remainingAdvanceBalance:
-                                                                  payslip
-                                                                      .remainingAdvanceBalance,
-                                                            )
-                                                          : payslip)
-                                                      .toList();
-                                                  _detailedPayslips[p.id] =
-                                                      Payslip(
-                                                    id: p.id,
-                                                    name: p.name,
-                                                    number: p.number,
-                                                    employeeName:
-                                                        p.employeeName,
-                                                    state: 'Done',
-                                                    dateFrom: p.dateFrom,
-                                                    dateTo: p.dateTo,
-                                                    employeeId: p.employeeId,
-                                                    structId: p.structId,
-                                                    contractId: p.contractId,
-                                                    companyId: p.companyId,
-                                                    paid: p.paid,
-                                                    note: p.note,
-                                                    creditNote: p.creditNote,
-                                                    payslipRunId:
-                                                        p.payslipRunId,
-                                                    workedDaysLineIds:
-                                                        p.workedDaysLineIds,
-                                                    inputLineIds:
-                                                        p.inputLineIds,
-                                                    lineIds: p.lineIds,
-                                                    advanceDeductionAmount: p
-                                                        .advanceDeductionAmount,
-                                                    totalAdvancePay:
-                                                        p.totalAdvancePay,
-                                                    remainingAdvanceBalance: p
-                                                        .remainingAdvanceBalance,
-                                                  );
-                                                });
-                                                developer.log(
-                                                  'Confirmed payslip: ID=${p.id}, State=Done',
-                                                  name: 'PayslipPage',
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          const Color.fromARGB(255, 7, 56, 80),
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
+              : Column(
+                  children: [
+                    SearchFilterBar(
+                      controller: _searchController,
+                      hintText: 'Search by employee name...',
+                      onChanged: () {
+                        setState(() {
+                          _searchQuery = _searchController.text.toLowerCase();
+                        });
+                      },
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    ),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _fetchPayslips,
+                        child: Builder(
+                          builder: (context) {
+                            final filteredPayslips = _searchQuery.isEmpty
+                                ? _payslips
+                                : _payslips
+                                    .where((p) => p.employeeName
+                                        .toLowerCase()
+                                        .contains(_searchQuery))
+                                    .toList();
+                            if (filteredPayslips.isEmpty) {
+                              return const Center(
+                                child: Text(
+                                  'No payslips found',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              );
+                            }
+                            return ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              itemCount: filteredPayslips.length,
+                              itemBuilder: (context, index) {
+                                final p = filteredPayslips[index];
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 2,
+                                  child: ExpansionTile(
+                                    title: Text(
+                                      p.employeeName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: Color.fromARGB(255, 7, 56, 80),
                                       ),
                                     ),
-                                    child: const Text('View Details'),
+                                    subtitle: Text(
+                                      '${DateFormat('MMM dd, yyyy').format(p.dateFrom!)} - ${DateFormat('MMM dd, yyyy').format(p.dateTo!)}',
+                                      style: TextStyle(color: Colors.grey[600]),
+                                    ),
+                                    trailing: Chip(
+                                      label: Text(
+                                        p.state.toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      backgroundColor: p.state == 'done'
+                                          ? Colors.green
+                                          : p.state == 'draft'
+                                              ? Colors.orange
+                                              : Colors.blue,
+                                    ),
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            _buildDetailRow(
+                                                'Payslip Number', p.number),
+                                            _buildDetailRow('State', p.state),
+                                            _buildDetailRow(
+                                                'Note',
+                                                p.note.isEmpty
+                                                    ? 'N/A'
+                                                    : p.note),
+                                            _buildDetailRow(
+                                                'Paid', p.paid ? 'Yes' : 'No'),
+                                            _buildDetailRow('Credit Note',
+                                                p.creditNote ? 'Yes' : 'No'),
+                                            _buildDetailRow('Advance Deduction',
+                                                '₹${p.advanceDeductionAmount.toStringAsFixed(2)}'),
+                                            _buildDetailRow('Total Advance Pay',
+                                                '₹${p.totalAdvancePay.toStringAsFixed(2)}'),
+                                            _buildDetailRow(
+                                                'Remaining Advance Balance',
+                                                '₹${p.remainingAdvanceBalance.toStringAsFixed(2)}'),
+                                            const SizedBox(height: 16),
+                                            ElevatedButton(
+                                              onPressed: () async {
+                                                await _fetchPayslipDetails(
+                                                    p.id);
+                                                final detailedP =
+                                                    _detailedPayslips[p.id];
+                                                if (detailedP != null) {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          PayslipDetailsPage(
+                                                        payslip: detailedP,
+                                                        onCompute: (newLines) {
+                                                          setState(() {
+                                                            _payslips =
+                                                                _payslips.map(
+                                                                    (payslip) {
+                                                              if (payslip.id ==
+                                                                  p.id) {
+                                                                return Payslip(
+                                                                  id: payslip
+                                                                      .id,
+                                                                  name: payslip
+                                                                      .name,
+                                                                  number: payslip
+                                                                      .number,
+                                                                  employeeName:
+                                                                      payslip
+                                                                          .employeeName,
+                                                                  state: payslip
+                                                                      .state,
+                                                                  dateFrom: payslip
+                                                                      .dateFrom,
+                                                                  dateTo: payslip
+                                                                      .dateTo,
+                                                                  employeeId:
+                                                                      payslip
+                                                                          .employeeId,
+                                                                  structId: payslip
+                                                                      .structId,
+                                                                  contractId:
+                                                                      payslip
+                                                                          .contractId,
+                                                                  companyId: payslip
+                                                                      .companyId,
+                                                                  paid: payslip
+                                                                      .paid,
+                                                                  note: payslip
+                                                                      .note,
+                                                                  creditNote:
+                                                                      payslip
+                                                                          .creditNote,
+                                                                  payslipRunId:
+                                                                      payslip
+                                                                          .payslipRunId,
+                                                                  workedDaysLineIds:
+                                                                      payslip
+                                                                          .workedDaysLineIds,
+                                                                  inputLineIds:
+                                                                      payslip
+                                                                          .inputLineIds,
+                                                                  lineIds:
+                                                                      newLines,
+                                                                  advanceDeductionAmount:
+                                                                      payslip
+                                                                          .advanceDeductionAmount,
+                                                                  totalAdvancePay:
+                                                                      payslip
+                                                                          .totalAdvancePay,
+                                                                  remainingAdvanceBalance:
+                                                                      payslip
+                                                                          .remainingAdvanceBalance,
+                                                                );
+                                                              }
+                                                              return payslip;
+                                                            }).toList();
+                                                            _detailedPayslips[
+                                                                p.id] = Payslip(
+                                                              id: p.id,
+                                                              name: p.name,
+                                                              number: p.number,
+                                                              employeeName: p
+                                                                  .employeeName,
+                                                              state: p.state,
+                                                              dateFrom:
+                                                                  p.dateFrom,
+                                                              dateTo: p.dateTo,
+                                                              employeeId:
+                                                                  p.employeeId,
+                                                              structId:
+                                                                  p.structId,
+                                                              contractId:
+                                                                  p.contractId,
+                                                              companyId:
+                                                                  p.companyId,
+                                                              paid: p.paid,
+                                                              note: p.note,
+                                                              creditNote:
+                                                                  p.creditNote,
+                                                              payslipRunId: p
+                                                                  .payslipRunId,
+                                                              workedDaysLineIds:
+                                                                  p.workedDaysLineIds,
+                                                              inputLineIds: p
+                                                                  .inputLineIds,
+                                                              lineIds: newLines,
+                                                              advanceDeductionAmount:
+                                                                  p.advanceDeductionAmount,
+                                                              totalAdvancePay: p
+                                                                  .totalAdvancePay,
+                                                              remainingAdvanceBalance:
+                                                                  p.remainingAdvanceBalance,
+                                                            );
+                                                          });
+                                                          developer.log(
+                                                            'Updated payslip lines for ID: ${p.id}, New lines: ${newLines.length}',
+                                                            name: 'PayslipPage',
+                                                          );
+                                                        },
+                                                        onConfirm: () {
+                                                          setState(() {
+                                                            _payslips = _payslips
+                                                                .map((payslip) => payslip.id == p.id
+                                                                    ? Payslip(
+                                                                        id: payslip
+                                                                            .id,
+                                                                        name: payslip
+                                                                            .name,
+                                                                        number:
+                                                                            payslip.number,
+                                                                        employeeName:
+                                                                            payslip.employeeName,
+                                                                        state:
+                                                                            'Done',
+                                                                        dateFrom:
+                                                                            payslip.dateFrom,
+                                                                        dateTo:
+                                                                            payslip.dateTo,
+                                                                        employeeId:
+                                                                            payslip.employeeId,
+                                                                        structId:
+                                                                            payslip.structId,
+                                                                        contractId:
+                                                                            payslip.contractId,
+                                                                        companyId:
+                                                                            payslip.companyId,
+                                                                        paid: payslip
+                                                                            .paid,
+                                                                        note: payslip
+                                                                            .note,
+                                                                        creditNote:
+                                                                            payslip.creditNote,
+                                                                        payslipRunId:
+                                                                            payslip.payslipRunId,
+                                                                        workedDaysLineIds:
+                                                                            payslip.workedDaysLineIds,
+                                                                        inputLineIds:
+                                                                            payslip.inputLineIds,
+                                                                        lineIds:
+                                                                            payslip.lineIds,
+                                                                        advanceDeductionAmount:
+                                                                            payslip.advanceDeductionAmount,
+                                                                        totalAdvancePay:
+                                                                            payslip.totalAdvancePay,
+                                                                        remainingAdvanceBalance:
+                                                                            payslip.remainingAdvanceBalance,
+                                                                      )
+                                                                    : payslip)
+                                                                .toList();
+                                                            _detailedPayslips[
+                                                                p.id] = Payslip(
+                                                              id: p.id,
+                                                              name: p.name,
+                                                              number: p.number,
+                                                              employeeName: p
+                                                                  .employeeName,
+                                                              state: 'Done',
+                                                              dateFrom:
+                                                                  p.dateFrom,
+                                                              dateTo: p.dateTo,
+                                                              employeeId:
+                                                                  p.employeeId,
+                                                              structId:
+                                                                  p.structId,
+                                                              contractId:
+                                                                  p.contractId,
+                                                              companyId:
+                                                                  p.companyId,
+                                                              paid: p.paid,
+                                                              note: p.note,
+                                                              creditNote:
+                                                                  p.creditNote,
+                                                              payslipRunId: p
+                                                                  .payslipRunId,
+                                                              workedDaysLineIds:
+                                                                  p.workedDaysLineIds,
+                                                              inputLineIds: p
+                                                                  .inputLineIds,
+                                                              lineIds:
+                                                                  p.lineIds,
+                                                              advanceDeductionAmount:
+                                                                  p.advanceDeductionAmount,
+                                                              totalAdvancePay: p
+                                                                  .totalAdvancePay,
+                                                              remainingAdvanceBalance:
+                                                                  p.remainingAdvanceBalance,
+                                                            );
+                                                          });
+                                                          developer.log(
+                                                            'Confirmed payslip: ID=${p.id}, State=Done',
+                                                            name: 'PayslipPage',
+                                                          );
+                                                        },
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    const Color.fromARGB(
+                                                        255, 7, 56, 80),
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                              child: const Text('View Details'),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
+                                );
+                              },
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -968,6 +1040,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
   bool _isComputing = false;
   bool _isConfirming = false;
   bool _isLoadingDetails = false;
+  bool _hasComputed = false;
   List<dynamic> _workedDays = [];
   List<dynamic> _inputs = [];
   String _employeeName = '';
@@ -978,6 +1051,8 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
   void initState() {
     super.initState();
     _currentPayslip = widget.payslip;
+    // If lines already exist (compute was done before), keep them visible
+    _hasComputed = widget.payslip.lineIds.isNotEmpty;
     _fetchPayslipDetails();
   }
 
@@ -1014,13 +1089,16 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
   }
 
   Future<void> _computeSheet() async {
-    if (_currentPayslip.state != 'draft' &&
-        _currentPayslip.state != 'verify') {
+    if (_currentPayslip.state != 'draft' && _currentPayslip.state != 'verify') {
       developer.log(
         'Cannot compute payslip: ID=${_currentPayslip.id}, State=${_currentPayslip.state}',
         name: 'PayslipDetailsPage',
       );
-      _showSnackBar('Payslip must be in Draft or Waiting state to compute');
+      // _showSnackBar('Payslip must be in Draft or Waiting state to compute');
+      _showSnackBar(
+        'Payslip is already computed. You can proceed to confirm it.',
+        color: Colors.orange,
+      );
       return;
     }
 
@@ -1035,6 +1113,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
           await _payslipService.computePayslipSheet(_currentPayslip.id);
       setState(() {
         _currentPayslip = _currentPayslip.copyWith(lineIds: computedLines);
+        _hasComputed = true;
       });
       widget.onCompute(computedLines);
       developer.log(
@@ -1054,13 +1133,15 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
   }
 
   Future<void> _confirmPayslip() async {
-    if (_currentPayslip.state != 'draft' &&
-        _currentPayslip.state != 'verify') {
+    if (_currentPayslip.state != 'draft' && _currentPayslip.state != 'verify') {
       developer.log(
         'Cannot confirm payslip: ID=${_currentPayslip.id}, State=${_currentPayslip.state}',
         name: 'PayslipDetailsPage',
       );
-      _showSnackBar('Payslip must be in Draft or Waiting state to confirm');
+      _showSnackBar(
+        'Payslip is already confirmed.',
+        color: Colors.orange,
+      );
       return;
     }
 
@@ -1484,7 +1565,8 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
                             Text(
                               input['name'] ?? 'N/A',
                               softWrap: true,
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w500),
                             ),
                             Text(
                               'Code: ${input['code'] ?? 'N/A'}',
@@ -1532,7 +1614,6 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -1541,8 +1622,11 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
                 // Basic payslip information
                 _buildDetailRow('Payslip Number', _currentPayslip.number),
                 _buildDetailRow('State', _currentPayslip.state),
-                _buildDetailRow('Note',
-                    _currentPayslip.note.isEmpty ? 'N/A' : _currentPayslip.note),
+                _buildDetailRow(
+                    'Note',
+                    _currentPayslip.note.isEmpty
+                        ? 'N/A'
+                        : _currentPayslip.note),
                 _buildDetailRow('Paid', _currentPayslip.paid ? 'Yes' : 'No'),
                 _buildDetailRow(
                     'Credit Note', _currentPayslip.creditNote ? 'Yes' : 'No'),
@@ -1559,44 +1643,46 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
                 // Inputs Section
                 _buildInputsSection(),
 
-                // Salary Lines Section (existing)
-                const SizedBox(height: 16),
-                Text(
-                  'Salary Lines',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: const Color.fromARGB(255, 7, 56, 80),
-                      ),
-                ),
-                const SizedBox(height: 8),
-                ..._currentPayslip.lineIds.map((line) => Padding(
-                      padding: const EdgeInsets.only(left: 8, bottom: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  line['name'] ?? 'N/A',
-                                  softWrap: true,
+                // Salary Lines Section - only visible after Compute Sheet is clicked
+                if (_hasComputed && _currentPayslip.lineIds.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Salary Lines',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: const Color.fromARGB(255, 7, 56, 80),
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._currentPayslip.lineIds.map((line) => Padding(
+                        padding: const EdgeInsets.only(left: 8, bottom: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    line['name'] ?? 'N/A',
+                                    softWrap: true,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  '₹${(line['amount'] ?? 0.0).toStringAsFixed(2)}',
+                                  textAlign: TextAlign.right,
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w500),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                '₹${(line['amount'] ?? 0.0).toStringAsFixed(2)}',
-                                textAlign: TextAlign.right,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    )),
+                              ],
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
 
                 // Action Buttons
                 const SizedBox(height: 24),
@@ -1657,37 +1743,54 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
                 //     ),
                 //   ],
                 // ),
-                Wrap(
-  alignment: WrapAlignment.end,
-  spacing: 12,
-  runSpacing: 12,
-  children: [
-    // ✅ Always show Compute
-    ElevatedButton(
-      onPressed: _isComputing ? null : _computeSheet,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color.fromARGB(255, 7, 56, 80),
-        foregroundColor: Colors.white,
-      ),
-      child: _isComputing
-          ? const CircularProgressIndicator(color: Colors.white)
-          : const Text('Compute Sheet'),
-    ),
-
-    // ✅ Show Confirm ONLY after compute
-    if (_currentPayslip.lineIds.isNotEmpty)
-      ElevatedButton(
-        onPressed: _isConfirming ? null : _confirmPayslip,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green, // optional improvement
-          foregroundColor: Colors.white,
-        ),
-        child: _isConfirming
-            ? const CircularProgressIndicator(color: Colors.white)
-            : const Text('Confirm Payslip'),
-      ),
-  ],
-)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ElevatedButton(
+                      onPressed: _isComputing ? null : _computeSheet,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(255, 7, 56, 80),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: _isComputing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text('Compute Sheet'),
+                    ),
+                    if (_hasComputed && _currentPayslip.lineIds.isNotEmpty) ...[
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: _isConfirming ? null : _confirmPayslip,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: _isConfirming
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Confirm Payslip'),
+                      ),
+                    ],
+                  ],
+                )
               ],
             ),
           ),

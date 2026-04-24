@@ -7,6 +7,7 @@ import '/services/advance_pay_service.dart';
 import '/models/advance_pay_model.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'utils/app_layout.dart';
+import 'widget/search_filter_bar.dart';
 
 class AdvancePayPage extends StatefulWidget {
   const AdvancePayPage({super.key});
@@ -28,6 +29,8 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
   bool _showForm = false;
   bool _groupByEmployee = false;
   List<AdvancePayData> _advancePayRecords = [];
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -206,6 +209,12 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -247,20 +256,42 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
                   style: const TextStyle(
                       fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                SearchFilterBar(
+                  controller: _searchController,
+                  hintText: 'Search by employee name...',
+                  onChanged: () {
+                    setState(() {
+                      _searchQuery = _searchController.text.toLowerCase();
+                    });
+                  },
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                const SizedBox(height: 8),
                 Expanded(
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
-                      : _advancePayRecords.isEmpty
-                          ? const Center(child: Text('No records found'))
-                          : ListView.builder(
-                              itemCount: _advancePayRecords.length,
+                      : Builder(
+                          builder: (context) {
+                            final filtered = _searchQuery.isEmpty
+                                ? _advancePayRecords
+                                : _advancePayRecords
+                                    .where((r) => r.employeeName
+                                        .toLowerCase()
+                                        .contains(_searchQuery))
+                                    .toList();
+                            if (filtered.isEmpty) {
+                              return const Center(
+                                  child: Text('No records found'));
+                            }
+                            return ListView.builder(
+                              itemCount: filtered.length,
                               itemBuilder: (context, index) {
-                                final record = _advancePayRecords[index];
+                                final record = filtered[index];
                                 return Card(
                                   elevation: 2,
-                                  margin:
-                                      const EdgeInsets.symmetric(vertical: 4),
+                                  margin: const EdgeInsets.symmetric(
+                                      vertical: 4),
                                   child: ListTile(
                                     title: Text(
                                       record.employeeName,
@@ -283,13 +314,15 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
                                     ),
                                     trailing: Text(
                                       'ID: ${record.id}',
-                                      style:
-                                          const TextStyle(color: Colors.grey),
+                                      style: const TextStyle(
+                                          color: Colors.grey),
                                     ),
                                   ),
                                 );
                               },
-                            ),
+                            );
+                          },
+                        ),
                 ),
               ],
             ),

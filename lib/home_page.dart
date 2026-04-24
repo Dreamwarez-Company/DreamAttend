@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:upgrader/upgrader.dart';
 import 'Services/api_service.dart';
@@ -118,6 +119,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void _navigateToPage(BuildContext context, Widget page) async {
     try {
       if (await _isSessionValid()) {
+         if (!mounted) return;
         Navigator.push(
           context,
           PageRouteBuilder(
@@ -140,10 +142,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         );
       } else {
         _showSnackBar('Session expired. Please log in again.', Colors.red);
-        Navigator.pushReplacementNamed(context, '/login');
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context,'/login',(route) => false,);
       }
     } catch (e) {
-      _showSnackBar('Error navigating: $e', Colors.red);
+      _showSnackBar('Something went wrong. Please try again.', Colors.red);
     }
   }
 
@@ -225,7 +228,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               children: [
                 _buildWelcomeHeader(),
                 const SizedBox(height: 20),
-                _buildQuickStats(),
+                // _buildQuickStats(),
                 const SizedBox(height: 16),
                 _buildDashboardGrid(),
                 const SizedBox(height: 16),
@@ -282,8 +285,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               end: Alignment.bottomRight,
               colors: [
                 AppColors.primaryBlue,
-                AppColors.primaryBlue.withOpacity(0.9),
-                AppColors.accentTeal.withOpacity(0.8),
+                AppColors.accentTeal,
+                // AColors: AppColors.
+                AppColors.accentTeal.withOpacity(0.85),
               ],
             ),
           ),
@@ -324,7 +328,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             color: Colors.transparent,
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
-                onTap: _openUserProfile,
+                // onTap: _openUserProfile,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _openUserProfile();
+                  },
                 child: Container(
                   padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -368,122 +376,83 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             borderRadius: BorderRadius.circular(24),
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              padding: const EdgeInsets.all(28),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white,
-                    Color(0xFFFCFCFC),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: AppColors.accentTeal.withOpacity(0.1),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accentTeal.withOpacity(0.08),
-                    blurRadius: 25,
-                    spreadRadius: 2,
-                    offset: const Offset(0, 8),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+  color: Colors.white, // ✅ clean replacement
+  borderRadius: BorderRadius.circular(24),
+  border: Border.all(
+    color: AppColors.accentTeal.withOpacity(0.1),
+    width: 1.5,
+  ),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.06),
+      blurRadius: 20,
+      offset: const Offset(0, 10),
+    ),
+    BoxShadow(
+      color: Colors.black.withOpacity(0.03),
+      blurRadius: 10,
+      offset: const Offset(0, 2),
+    ),
+  ],
+),
               child: Row(
                 children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.accentTeal,
-                          AppColors.accentTeal.withOpacity(0.8),
-                          AppColors.primaryBlue.withOpacity(0.9),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.accentTeal.withOpacity(0.4),
-                          blurRadius: 15,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        const Center(
-                          child: Icon(
-                            Icons.person_outline,
-                            color: Colors.white,
-                            size: 32,
-                          ),
-                        ),
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: AppColors.successGreen,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  CircleAvatar(
+  radius: 32,
+  backgroundColor: AppColors.accentTeal,
+  child: Text(
+    widget.name.isNotEmpty
+        ? widget.name[0].toUpperCase()
+        : '?',
+    style: const TextStyle(
+      color: Colors.white,
+      fontSize: 22,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+),
+             
+                  
                   const SizedBox(width: 20),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Text(
-                              _getTimeBasedGreeting(),
-                              style: const TextStyle(
-                                fontSize: 15,
-                                color: AppColors.textLight,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              _getTimeBasedIcon(),
-                              color: AppColors.accentTeal,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.name,
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
-                            letterSpacing: -0.5,
-                            height: 1.1,
-                          ),
-                        ),
+                        Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Text(
+      '${_getTimeBasedGreeting()},',
+      style: const TextStyle(
+        fontSize: 14,
+        color: AppColors.textLight,
+        fontWeight: FontWeight.w500,
+      ),
+    ),
+    const SizedBox(height: 4),
+
+    Text(
+      widget.name,
+      style: const TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textDark,
+      ),
+    ),
+
+    const SizedBox(height: 2),
+
+    Text(
+      widget.jobTitle,
+      style: const TextStyle(
+        fontSize: 13,
+        color: AppColors.textLight,
+      ),
+    ),
+  ],
+)
                       ],
                     ),
                   ),
@@ -604,14 +573,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           width: 4,
                           height: 24,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                AppColors.accentTeal,
-                                AppColors.primaryBlue,
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
+                            
+                            // color: Colors.white.withOpacity(0.95),
+                            color: AppColors.accentTeal,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -620,7 +584,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           'Quick Access',
                           style: TextStyle(
                             fontSize: 20,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w500,
                             color: AppColors.textDark,
                             letterSpacing: -0.3,
                           ),
@@ -783,14 +747,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   ) {
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white,
-            Color(0xFFFDFDFD),
-          ],
-        ),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white,
+                Colors.white,
+              ],
+            ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: color.withOpacity(0.15),
@@ -816,7 +780,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(24),
           splashColor: color.withOpacity(0.1),
           highlightColor: color.withOpacity(0.05),
-          onTap: () => _navigateToPage(context, page),
+          // onTap: () => _navigateToPage(context, page),
+          onTap: () {
+  HapticFeedback.lightImpact();
+  _navigateToPage(context, page);
+},
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -874,7 +842,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textDark,
                     letterSpacing: -0.2,
                   ),

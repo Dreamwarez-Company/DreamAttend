@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '/models/leave_request.dart';
 import '/services/leave_service.dart';
-import '/services/employee_service.dart';
-import '/models/employee.dart';
 import 'widget/search_filter_bar.dart';
 import 'utils/app_layout.dart';
 
@@ -28,7 +26,6 @@ class _ApplyLeaveState extends State<ApplyLeave> {
   final TextEditingController _endDateController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final LeaveService _leaveService = LeaveService();
-  final EmployeeService _employeeService = EmployeeService();
 
   bool _isLoading = false;
   bool _isFetching = false;
@@ -42,7 +39,6 @@ class _ApplyLeaveState extends State<ApplyLeave> {
   String? _selectedFilterStatus = 'all';
   String? _tempFilterStatus = 'all';
 
-  List<Employee> _employees = [];
   List<LeaveRequest> _leaveRequests = [];
   List<LeaveRequest> _filteredLeaveRequests = [];
 
@@ -50,7 +46,6 @@ class _ApplyLeaveState extends State<ApplyLeave> {
   void initState() {
     super.initState();
     _fetchLeaveRequests();
-    _fetchEmployees();
     _searchController.addListener(_filterRequests);
   }
 
@@ -62,17 +57,6 @@ class _ApplyLeaveState extends State<ApplyLeave> {
     _startDateController.dispose();
     _endDateController.dispose();
     super.dispose();
-  }
-
-  Future<void> _fetchEmployees() async {
-    try {
-      final employees = await _employeeService.getEmployees();
-      setState(() {
-        _employees = employees;
-      });
-    } catch (e) {
-      _showResultDialog('Error', 'Unable to load employee list.', false);
-    }
   }
 
   Future<void> _fetchLeaveRequests() async {

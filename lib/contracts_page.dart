@@ -904,7 +904,7 @@ class _ContractsPageState extends State<ContractsPage> {
                               _contracts = latestContracts;
                             });
                             errorSnackBar(
-                              'Error',
+                              'Oops!',
                               'Contract already exists for this employee',
                             );
                             return;

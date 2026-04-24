@@ -1,14 +1,12 @@
 import 'dart:convert';
-import '/models/task_request.dart';
 import '/models/employee.dart';
+import '/models/task_request.dart';
 import '/controller/app_constants.dart';
 import 'api_service.dart';
-import 'employee_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TaskService {
   final ApiService _apiService = ApiService();
-  final EmployeeService _employeeService = EmployeeService();
   String? _sessionId;
 
   /// Load the stored sessionId from SharedPreferences
@@ -88,43 +86,12 @@ class TaskService {
       final responseBody = jsonDecode(response.body);
       print('API Response: $responseBody');
       if (responseBody is Map && responseBody.containsKey('tasks')) {
-        final employees = await _employeeService.getEmployees();
-        Map<int, String> employeeIdToName = {
-          for (var emp in employees) emp.id: emp.name,
-        };
-        Map<String, String> employeeNameToId = {
-          for (var emp in employees) emp.name: emp.id.toString(),
-        };
-        print('Employee ID to Name Map: $employeeIdToName');
-        print('Employee Name to ID Map: $employeeNameToId');
-
         return (responseBody['tasks'] as List).map((e) {
-          String assignedByName = e['assigned_by']?.toString() ?? 'Unknown';
-          String assignedToName = e['employee_name']?.toString() ?? 'Unknown';
-
-          String employeeIdStr = employeeNameToId[assignedToName] ?? '0';
-          String assignByStr = employeeNameToId[assignedByName] ?? '0';
-
           print(
             'Task: $e\n'
-            'Employee ID: $employeeIdStr, Assign By: $assignByStr\n'
-            'Assigned To Name: $assignedToName, Assigned By Name: $assignedByName\n'
             'Start Date (raw): ${e['start_date']}, Deadline (raw): ${e['deadline']}, End Date (raw): ${e['end_date']}',
           );
-
-          return TaskRequest(
-            taskId: e['task_id']?.toInt() ?? 0,
-            employeeId: employeeIdStr,
-            assignBy: assignByStr,
-            name: e['task_name']?.toString() ?? e['name']?.toString() ?? '',
-            startDate: e['start_date']?.toString(),
-            endDate: e['end_date']?.toString(),
-            deadline: e['deadline']?.toString() ?? '',
-            description: e['description']?.toString(),
-            state: e['state']?.toString(),
-            assignedToName: assignedToName,
-            assignedByName: assignedByName,
-          );
+          return TaskRequest.fromJson(e as Map<String, dynamic>);
         }).toList();
       }
       throw Exception(

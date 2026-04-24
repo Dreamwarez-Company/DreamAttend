@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart'; // Added for persistent storage
+import 'package:shared_preferences/shared_preferences.dart';
 import '/models/attendance.dart';
 import '/models/attendance_report.dart';
 import '/services/attendance_services.dart';
@@ -40,6 +40,7 @@ class _AttendancePageState extends State<AttendancePage> {
   Timer? _fabTimer;
   final TextEditingController _searchController = TextEditingController();
   DateTime? _selectedDate;
+  List<AttendanceReport>? _reports; // cache for report data
 
   // Key for storing the FAB hide timestamp
   static const String _fabHideTimestampKey = 'fab_hide_timestamp';
@@ -99,20 +100,6 @@ class _AttendancePageState extends State<AttendancePage> {
         '${istTime.second.toString().padLeft(2, '0')}';
   }
 
-  void _showCustomSnackBar({
-    required BuildContext context,
-    required String message,
-    required Color backgroundColor,
-    required IconData icon,
-    Duration duration = const Duration(seconds: 3),
-  }) {
-    showStatusSnackBar(
-      message,
-      color: backgroundColor,
-      duration: duration,
-    );
-  }
-
   Future<void> fetchAttendanceData() async {
     setState(() => _isLoading = true);
     try {
@@ -147,11 +134,10 @@ class _AttendancePageState extends State<AttendancePage> {
         }
       });
     } catch (e) {
-      _showCustomSnackBar(
-        context: context,
-        message: "Failed to load attendance data: $e",
-        backgroundColor: Colors.redAccent,
-        icon: Icons.error_outline,
+      debugPrint('Failed to load attendance data: $e');
+      showAppSnackBar(
+        message: "Unable to load attendance data. Please try again.",
+        type: AppSnackBarType.error,
       );
     } finally {
       setState(() => _isLoading = false);
@@ -179,15 +165,34 @@ class _AttendancePageState extends State<AttendancePage> {
     LocationPermission permission;
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return false;
+    if (!serviceEnabled) {
+      showAppSnackBar(
+        message: "Please turn on your location services.",
+        type: AppSnackBarType.warning,
+      );
+      return false;
+    }
 
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return false;
+      if (permission == LocationPermission.denied) {
+        showAppSnackBar(
+          message: "Location permission is required to continue.",
+          type: AppSnackBarType.warning,
+        );
+        return false;
+      }
     }
 
-    if (permission == LocationPermission.deniedForever) return false;
+    if (permission == LocationPermission.deniedForever) {
+      showAppSnackBar(
+        message:
+            "Location permission permanently denied. Enable it from settings.",
+        type: AppSnackBarType.error,
+      );
+      return false;
+    }
 
     Position position = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
@@ -208,11 +213,9 @@ class _AttendancePageState extends State<AttendancePage> {
     try {
       bool isNearby = await isWithinAllowedRadius();
       if (!isNearby) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Please be within the designated check-in area.",
-          backgroundColor: Colors.redAccent,
-          icon: Icons.location_off,
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -226,11 +229,9 @@ class _AttendancePageState extends State<AttendancePage> {
           : null;
 
       if (lastCheckInDate == today) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "You have already checked in today.",
-          backgroundColor: Colors.orangeAccent,
-          icon: Icons.check_circle_outline,
+          type: AppSnackBarType.warning,
         );
         return;
       }
@@ -243,22 +244,19 @@ class _AttendancePageState extends State<AttendancePage> {
         filteredUsers = users;
       });
 
-      _showCustomSnackBar(
-        context: context,
+      showAppSnackBar(
         message: "Check-in recorded successfully.",
-        backgroundColor: Colors.green,
-        icon: Icons.check_circle,
+        type: AppSnackBarType.success,
       );
     } catch (e) {
-      String errorMessage = "Failed to record check-in: $e";
+      debugPrint('Failed to record check-in: $e');
+      String errorMessage = "Unable to record check-in. Please try again.";
       if (e.toString().contains("Please create an attendance record first")) {
         errorMessage = "Please create an attendance record before checking in.";
       }
-      _showCustomSnackBar(
-        context: context,
+      showAppSnackBar(
         message: errorMessage,
-        backgroundColor: Colors.redAccent,
-        icon: Icons.error_outline,
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -269,11 +267,9 @@ class _AttendancePageState extends State<AttendancePage> {
     try {
       bool isNearby = await isWithinAllowedRadius();
       if (!isNearby) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Please be within the designated check-out area.",
-          backgroundColor: Colors.redAccent,
-          icon: Icons.location_off,
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -283,20 +279,26 @@ class _AttendancePageState extends State<AttendancePage> {
       final today = DateTime(now.year, now.month, now.day);
       final checkIn = users[index].checkIn;
 
+      if (checkIn == null) {
+        showAppSnackBar(
+          message: "Please check in first.",
+          type: AppSnackBarType.warning,
+        );
+        return;
+      }
+
       final checkInIst = checkIn is tz.TZDateTime
           ? checkIn
-          : tz.TZDateTime.from(checkIn!, istLocation);
+          : tz.TZDateTime.from(checkIn, istLocation);
       final checkInDate = DateTime(
         checkInIst.year,
         checkInIst.month,
         checkInIst.day,
       );
       if (checkInDate != today) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Cannot check out for a different day.",
-          backgroundColor: Colors.redAccent,
-          icon: Icons.calendar_today,
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -322,19 +324,16 @@ class _AttendancePageState extends State<AttendancePage> {
           filteredUsers = users;
         });
 
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Check-out recorded successfully.",
-          backgroundColor: Colors.green,
-          icon: Icons.check_circle,
+          type: AppSnackBarType.success,
         );
       }
     } catch (e) {
-      _showCustomSnackBar(
-        context: context,
-        message: "Failed to record check-out: $e",
-        backgroundColor: Colors.redAccent,
-        icon: Icons.error_outline,
+      debugPrint('Failed to record check-out: $e');
+      showAppSnackBar(
+        message: "Unable to record check-out. Please try again.",
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -345,11 +344,9 @@ class _AttendancePageState extends State<AttendancePage> {
     try {
       bool isNearby = await isWithinAllowedRadius();
       if (!isNearby) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Please be within the designated lunch-out area.",
-          backgroundColor: Colors.redAccent,
-          icon: Icons.location_off,
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -359,30 +356,34 @@ class _AttendancePageState extends State<AttendancePage> {
       final today = DateTime(now.year, now.month, now.day);
       final checkIn = users[index].checkIn;
 
+      if (checkIn == null) {
+        showAppSnackBar(
+          message: "Please check in first.",
+          type: AppSnackBarType.warning,
+        );
+        return;
+      }
+
       final checkInIst = checkIn is tz.TZDateTime
           ? checkIn
-          : tz.TZDateTime.from(checkIn!, istLocation);
+          : tz.TZDateTime.from(checkIn, istLocation);
       final checkInDate = DateTime(
         checkInIst.year,
         checkInIst.month,
         checkInIst.day,
       );
       if (checkInDate != today) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Cannot mark lunch out for a different day.",
-          backgroundColor: Colors.redAccent,
-          icon: Icons.calendar_today,
+          type: AppSnackBarType.error,
         );
         return;
       }
 
       if (users[index].lunchOut != null) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Lunch out already recorded for today.",
-          backgroundColor: Colors.orangeAccent,
-          icon: Icons.warning_amber,
+          type: AppSnackBarType.warning,
         );
         return;
       }
@@ -395,18 +396,15 @@ class _AttendancePageState extends State<AttendancePage> {
         filteredUsers = users;
       });
 
-      _showCustomSnackBar(
-        context: context,
+      showAppSnackBar(
         message: "Lunch out recorded successfully.",
-        backgroundColor: Colors.green,
-        icon: Icons.check_circle,
+        type: AppSnackBarType.success,
       );
     } catch (e) {
-      _showCustomSnackBar(
-        context: context,
-        message: "Failed to record lunch out: $e",
-        backgroundColor: Colors.redAccent,
-        icon: Icons.error_outline,
+      debugPrint('Failed to record lunch out: $e');
+      showAppSnackBar(
+        message: "Unable to record lunch out. Please try again.",
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -417,11 +415,9 @@ class _AttendancePageState extends State<AttendancePage> {
     try {
       bool isNearby = await isWithinAllowedRadius();
       if (!isNearby) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Please be within the designated lunch-in area.",
-          backgroundColor: Colors.redAccent,
-          icon: Icons.location_off,
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -431,20 +427,26 @@ class _AttendancePageState extends State<AttendancePage> {
       final today = DateTime(now.year, now.month, now.day);
       final lunchOut = users[index].lunchOut;
 
+      if (lunchOut == null) {
+        showAppSnackBar(
+          message: "Please mark lunch out first.",
+          type: AppSnackBarType.warning,
+        );
+        return;
+      }
+
       final lunchOutIst = lunchOut is tz.TZDateTime
           ? lunchOut
-          : tz.TZDateTime.from(lunchOut!, istLocation);
+          : tz.TZDateTime.from(lunchOut, istLocation);
       final lunchOutDate = DateTime(
         lunchOutIst.year,
         lunchOutIst.month,
         lunchOutIst.day,
       );
       if (lunchOutDate != today) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Cannot mark lunch in for a different day.",
-          backgroundColor: Colors.redAccent,
-          icon: Icons.calendar_today,
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -470,19 +472,16 @@ class _AttendancePageState extends State<AttendancePage> {
           filteredUsers = users;
         });
 
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Lunch in recorded successfully.",
-          backgroundColor: Colors.green,
-          icon: Icons.check_circle,
+          type: AppSnackBarType.success,
         );
       }
     } catch (e) {
-      _showCustomSnackBar(
-        context: context,
-        message: "Failed to record lunch in: $e",
-        backgroundColor: Colors.redAccent,
-        icon: Icons.error_outline,
+      debugPrint('Failed to record lunch in: $e');
+      showAppSnackBar(
+        message: "Unable to record lunch in. Please try again.",
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -490,22 +489,18 @@ class _AttendancePageState extends State<AttendancePage> {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "Please turn on your location services.",
-          backgroundColor: Colors.orangeAccent,
-          icon: Icons.gps_off,
+          type: AppSnackBarType.warning,
         );
         return;
       }
 
       bool isNearby = await isWithinAllowedRadius();
       if (!isNearby) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "You must be at the office to check in.",
-          backgroundColor: Colors.redAccent,
-          icon: Icons.location_off,
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -526,11 +521,9 @@ class _AttendancePageState extends State<AttendancePage> {
       });
 
       if (alreadyCheckedIn) {
-        _showCustomSnackBar(
-          context: context,
+        showAppSnackBar(
           message: "You have already checked in today!",
-          backgroundColor: Colors.orangeAccent,
-          icon: Icons.check_circle_outline,
+          type: AppSnackBarType.warning,
         );
         return;
       }
@@ -558,7 +551,8 @@ class _AttendancePageState extends State<AttendancePage> {
       });
       await _saveFabHideTimestamp();
       _fabTimer?.cancel();
-      _fabTimer = Timer(const Duration(minutes: 15), () async {
+      const hideDuration = Duration(minutes: 5);
+      _fabTimer = Timer(hideDuration, () async {
         setState(() {
           _isFabVisible = true;
         });
@@ -566,26 +560,23 @@ class _AttendancePageState extends State<AttendancePage> {
         await prefs.remove(_fabHideTimestampKey);
       });
 
-      _showCustomSnackBar(
-        context: context,
+      showAppSnackBar(
         message: "Checked in successfully at ${formatTime(now)}",
-        backgroundColor: Colors.green,
-        icon: Icons.check_circle,
+        type: AppSnackBarType.success,
         duration: const Duration(seconds: 4),
       );
     } catch (e) {
-      String errorMsg = "Check-in failed: $e";
+      debugPrint('Check-in failed: $e');
+      String errorMsg = "Unable to record check-in. Please try again.";
       if (e.toString().contains("404")) {
         errorMsg = "Server endpoint not found. Contact admin.";
       } else if (e.toString().contains("500")) {
         errorMsg = "Server error. Try again later.";
       }
 
-      _showCustomSnackBar(
-        context: context,
+      showAppSnackBar(
         message: errorMsg,
-        backgroundColor: Colors.redAccent,
-        icon: Icons.error_outline,
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -679,7 +670,7 @@ class _AttendancePageState extends State<AttendancePage> {
                         ),
                         child: SearchFilterBar(
                           controller: _searchController,
-                          hintText: 'Search team members...',
+                          hintText: 'Search team or employee...',
                           onChanged: _filterUsers,
                           padding: EdgeInsets.zero,
                           iconColor: Colors.grey,
@@ -794,8 +785,11 @@ class _AttendancePageState extends State<AttendancePage> {
                                                 56,
                                                 80,
                                               ),
-                                              child: Text(
-                                                user.name[0].toUpperCase(),
+                                          child: Text(
+                                                (user.name.trim().isNotEmpty
+                                                        ? user.name.trim()[0]
+                                                        : '?')
+                                                    .toUpperCase(),
                                                 style: const TextStyle(
                                                   color: Colors.white,
                                                   fontWeight: FontWeight.bold,
@@ -860,256 +854,131 @@ class _AttendancePageState extends State<AttendancePage> {
                                         ),
                                         const SizedBox(height: 5),
                                         if (!widget.isAdmin)
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceEvenly,
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
                                             children: [
-                                              Expanded(
+                                              SizedBox(
+                                                width: (MediaQuery.of(context).size.width - 96) / 2,
                                                 child: ElevatedButton(
-                                                  onPressed: user.daysPresent ==
-                                                              0 ||
-                                                          user.checkIn != null
-                                                      ? null
-                                                      : () =>
-                                                          markCheckIn(index),
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                    backgroundColor:
-                                                        Colors.green[700],
-                                                    foregroundColor:
-                                                        Colors.white,
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                    ),
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        vertical: 12),
+                                                  onPressed: user.checkIn != null ? null : () => markCheckIn(index),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.green[700],
+                                                    foregroundColor: Colors.white,
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                    padding: const EdgeInsets.symmetric(vertical: 12),
                                                     elevation: 2,
                                                   ),
-                                                  child: const Text(
-                                                    'Check In',
-                                                    style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.w500),
-                                                  ),
+                                                  child: const Text('Check In', style: TextStyle(fontWeight: FontWeight.w500)),
                                                 ),
                                               ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
+                                              SizedBox(
+                                                width: (MediaQuery.of(context).size.width - 96) / 2,
                                                 child: ElevatedButton(
-                                                  onPressed: user.checkIn ==
-                                                              null ||
-                                                          user.lunchOut != null
-                                                      ? null
-                                                      : () =>
-                                                          markLunchOut(index),
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                    backgroundColor:
-                                                        Colors.orange[700],
-                                                    foregroundColor:
-                                                        Colors.white,
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                    ),
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        vertical: 12),
+                                                  onPressed: user.checkIn == null || user.lunchOut != null ? null : () => markLunchOut(index),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.orange[700],
+                                                    foregroundColor: Colors.white,
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                    padding: const EdgeInsets.symmetric(vertical: 12),
                                                     elevation: 2,
                                                   ),
-                                                  child: const Text(
-                                                    'Lunch Out',
-                                                    style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.w500),
-                                                  ),
+                                                  child: const Text('Lunch Out', style: TextStyle(fontWeight: FontWeight.w500)),
                                                 ),
                                               ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
+                                              SizedBox(
+                                                width: (MediaQuery.of(context).size.width - 96) / 2,
                                                 child: ElevatedButton(
-                                                  onPressed: user.lunchOut ==
-                                                              null ||
-                                                          user.lunchIn != null
-                                                      ? null
-                                                      : () =>
-                                                          markLunchIn(index),
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                    backgroundColor:
-                                                        Colors.blue[700],
-                                                    foregroundColor:
-                                                        Colors.white,
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                    ),
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        vertical: 12),
+                                                  onPressed: user.lunchOut == null || user.lunchIn != null ? null : () => markLunchIn(index),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.blue[700],
+                                                    foregroundColor: Colors.white,
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                    padding: const EdgeInsets.symmetric(vertical: 12),
                                                     elevation: 2,
                                                   ),
-                                                  child: const Text(
-                                                    'Lunch In',
-                                                    style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.w500),
-                                                  ),
+                                                  child: const Text('Lunch In', style: TextStyle(fontWeight: FontWeight.w500)),
                                                 ),
                                               ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
+                                              SizedBox(
+                                                width: (MediaQuery.of(context).size.width - 96) / 2,
                                                 child: ElevatedButton(
-                                                  onPressed: user.lunchIn ==
-                                                              null ||
-                                                          user.checkOut != null
-                                                      ? null
-                                                      : () =>
-                                                          markCheckOut(index),
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                    backgroundColor:
-                                                        Colors.red[700],
-                                                    foregroundColor:
-                                                        Colors.white,
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                    ),
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        vertical: 12),
+                                                  onPressed: user.lunchIn == null || user.checkOut != null ? null : () => markCheckOut(index),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.red[700],
+                                                    foregroundColor: Colors.white,
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                    padding: const EdgeInsets.symmetric(vertical: 12),
                                                     elevation: 2,
                                                   ),
-                                                  child: const Text(
-                                                    'Check Out',
-                                                    style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.w500),
-                                                  ),
+                                                  child: const Text('Check Out', style: TextStyle(fontWeight: FontWeight.w500)),
                                                 ),
                                               ),
                                             ],
                                           ),
                                         const SizedBox(height: 16),
                                         ElevatedButton(
-                                          onPressed: () async {
+                                           onPressed: () async {
                                             try {
-                                              if (widget.isAdmin) {
-                                                final reports =
-                                                    await _attendanceService
-                                                        .fetchAllEmployeesAttendanceReport(
-                                                  month: DateTime.now()
-                                                      .month
-                                                      .toString()
-                                                      .padLeft(
-                                                        2,
-                                                        '0',
-                                                      ),
-                                                  year: DateTime.now().year,
-                                                );
+                                              // Use cached reports, fetch only if needed
+                                              _reports ??= await _attendanceService
+                                                  .fetchAllEmployeesAttendanceReport(
+                                                month: DateTime.now()
+                                                    .month
+                                                    .toString()
+                                                    .padLeft(2, '0'),
+                                                year: DateTime.now().year,
+                                              );
 
-                                                final userReport =
-                                                    reports.firstWhere(
-                                                  (report) =>
-                                                      report.employeeName
-                                                          .toLowerCase() ==
-                                                      user.name.toLowerCase(),
-                                                  orElse: () =>
-                                                      AttendanceReport(
-                                                    employeeId: 0,
-                                                    employeeName: user.name,
-                                                    month: DateTime.now()
-                                                        .month
-                                                        .toString()
-                                                        .padLeft(
-                                                          2,
-                                                          '0',
-                                                        ),
-                                                    year: DateTime.now().year,
-                                                    daysPresent: 0,
-                                                    totalHours: '00:00:00',
-                                                    fullLeaveDays: 0,
-                                                    halfLeaveDays: 0,
-                                                    wfhDays: 0,
-                                                    department: '',
-                                                    totalLunchDuration: '',
-                                                  ),
-                                                );
+                                              final targetName = widget.isAdmin
+                                                  ? user.name
+                                                  : widget.currentUserName;
 
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (
-                                                      context,
-                                                    ) =>
-                                                        UserReportPage(
-                                                      attendanceReport:
-                                                          userReport,
-                                                      currentUserName:
-                                                          user.name,
-                                                    ),
-                                                  ),
-                                                );
-                                              } else {
-                                                final reports =
-                                                    await _attendanceService
-                                                        .fetchAllEmployeesAttendanceReport(
-                                                  month: DateTime.now()
-                                                      .month
-                                                      .toString()
-                                                      .padLeft(
-                                                        2,
-                                                        '0',
-                                                      ),
-                                                  year: DateTime.now().year,
-                                                );
+                                              final userReport = _reports!.firstWhere(
+                                                (report) =>
+                                                    report.employeeName
+                                                        .toLowerCase() ==
+                                                    targetName.toLowerCase(),
+                                                orElse: () => widget.isAdmin
+                                                    ? AttendanceReport(
+                                                        employeeId: 0,
+                                                        employeeName: user.name,
+                                                        month: DateTime.now()
+                                                            .month
+                                                            .toString()
+                                                            .padLeft(2, '0'),
+                                                        year: DateTime.now().year,
+                                                        daysPresent: 0,
+                                                        totalHours: '00:00:00',
+                                                        fullLeaveDays: 0,
+                                                        halfLeaveDays: 0,
+                                                        wfhDays: 0,
+                                                        department: '',
+                                                        totalLunchDuration: '',
+                                                      )
+                                                    : throw Exception(
+                                                        'Report not found for $targetName'),
+                                              );
 
-                                                final userReport =
-                                                    reports.firstWhere(
-                                                  (report) =>
-                                                      report.employeeName
-                                                          .toLowerCase() ==
-                                                      widget.currentUserName
-                                                          .toLowerCase(),
-                                                  orElse: () => throw Exception(
-                                                    'Report not found for ${widget.currentUserName}',
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      UserReportPage(
+                                                    attendanceReport: userReport,
+                                                    currentUserName: targetName,
                                                   ),
-                                                );
-
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (
-                                                      context,
-                                                    ) =>
-                                                        UserReportPage(
-                                                      attendanceReport:
-                                                          userReport,
-                                                      currentUserName: widget
-                                                          .currentUserName,
-                                                    ),
-                                                  ),
-                                                );
-                                              }
+                                                ),
+                                              );
                                             } catch (e) {
-                                              _showCustomSnackBar(
-                                                context: context,
+                                              debugPrint(
+                                                'Unable to load report: $e',
+                                              );
+                                              _reports = null;
+                                              showAppSnackBar(
                                                 message:
-                                                    "Failed to load report: $e",
-                                                backgroundColor:
-                                                    Colors.redAccent,
-                                                icon: Icons.error_outline,
+                                                    "Unable to load report. Please try again.",
+                                                type: AppSnackBarType.error,
                                               );
                                             }
                                           },
