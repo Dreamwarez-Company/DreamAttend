@@ -84,6 +84,7 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
     } catch (e) {
       _showErrorSnackbar('Error: ${e.toString()}');
     } finally {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -97,6 +98,7 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
     } catch (e) {
       _showErrorSnackbar('Error fetching employees: ${e.toString()}');
     } finally {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -165,6 +167,7 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
     } catch (e) {
       _showErrorSnackbar('Error: ${e.toString()}');
     } finally {
+      if (!mounted) return;
       setState(() => _isSubmitting = false);
     }
   }
@@ -211,6 +214,9 @@ class _AdvancePayPageState extends State<AdvancePayPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _amountController.dispose();
+    _dateController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 

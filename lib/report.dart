@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:timezone/timezone.dart' as tz;
-import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart'; // Added for persistent storage
-import '/models/attendance.dart';
 import '/models/attendance_report.dart';
 import '/services/attendance_services.dart';
-import '/services/employee_service.dart';
 import 'utils/app_layout.dart';
 
 class UserReportPage extends StatefulWidget {
@@ -75,6 +69,21 @@ class _UserReportPageState extends State<UserReportPage> {
     return months[month - 1];
   }
 
+  String _formatDuration(String time) {
+    try {
+      final parts = time.split(':');
+      final hours = int.parse(parts[0]);
+      final minutes = int.parse(parts[1]);
+
+      if (hours == 0 && minutes == 0) return '0m';
+      if (hours == 0) return '${minutes}m';
+      if (minutes == 0) return '${hours}h';
+      return '${hours}h ${minutes}m';
+    } catch (_) {
+      return time;
+    }
+  }
+
   bool _hasNoData(AttendanceReport? report) {
     if (report == null) return true;
     return report.daysPresent == 0 &&
@@ -105,32 +114,37 @@ class _UserReportPageState extends State<UserReportPage> {
                 final month = index + 1;
                 final isSelected = month == _selectedMonth;
 
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-                    _updateMonth(month);
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color.fromARGB(255, 7, 56, 80)
-                          : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _updateMonth(month);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
                         color: isSelected
                             ? const Color.fromARGB(255, 7, 56, 80)
-                            : Colors.grey[300]!,
-                        width: 1,
+                            : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color.fromARGB(255, 7, 56, 80)
+                              : Colors.grey[300]!,
+                          width: 1,
+                        ),
                       ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        _getMonthName(month).substring(0, 3),
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black87,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
-                          fontSize: 14,
+                      child: Center(
+                        child: Text(
+                          _getMonthName(month).substring(0, 3),
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.black87,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
@@ -175,32 +189,37 @@ class _UserReportPageState extends State<UserReportPage> {
                 final year = startYear + index;
                 final isSelected = year == _selectedYear;
 
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-                    _updateYear(year);
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color.fromARGB(255, 7, 56, 80)
-                          : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _updateYear(year);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
                         color: isSelected
                             ? const Color.fromARGB(255, 7, 56, 80)
-                            : Colors.grey[300]!,
-                        width: 1,
+                            : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color.fromARGB(255, 7, 56, 80)
+                              : Colors.grey[300]!,
+                          width: 1,
+                        ),
                       ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        year.toString(),
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black87,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
-                          fontSize: 16,
+                      child: Center(
+                        child: Text(
+                          year.toString(),
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.black87,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -222,6 +241,7 @@ class _UserReportPageState extends State<UserReportPage> {
 
   void _updateMonth(int month) {
     if (month != _selectedMonth) {
+      if (!mounted) return;
       setState(() {
         _selectedMonth = month;
       });
@@ -231,6 +251,7 @@ class _UserReportPageState extends State<UserReportPage> {
 
   void _updateYear(int year) {
     if (year != _selectedYear) {
+      if (!mounted) return;
       setState(() {
         _selectedYear = year;
       });
@@ -239,6 +260,7 @@ class _UserReportPageState extends State<UserReportPage> {
   }
 
   Future<void> _fetchReportForSelectedDate() async {
+   if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final month = _selectedMonth.toString().padLeft(2, '0');
@@ -266,6 +288,7 @@ class _UserReportPageState extends State<UserReportPage> {
         ),
       );
 
+     if (!mounted) return;
       setState(() {
         _currentReport = userReport;
       });
@@ -277,6 +300,7 @@ class _UserReportPageState extends State<UserReportPage> {
         backgroundColor: Colors.redAccent,
         icon: Icons.error_outline,
       );
+      if (!mounted) return;
       setState(() {
         final month = _selectedMonth.toString().padLeft(2, '0');
         _currentReport = AttendanceReport(
@@ -294,6 +318,7 @@ class _UserReportPageState extends State<UserReportPage> {
         );
       });
     } finally {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -336,100 +361,108 @@ class _UserReportPageState extends State<UserReportPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: GestureDetector(
-                              onTap: _showMonthPicker,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                  horizontal: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.calendar_month,
-                                          color: Colors.blue,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          _getMonthName(_selectedMonth),
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.black87,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: _showMonthPicker,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                    horizontal: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.calendar_month,
+                                            color: Colors.blue,
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                    const Icon(
-                                      Icons.arrow_drop_down,
-                                      color: Colors.grey,
-                                    ),
-                                  ],
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            _getMonthName(_selectedMonth),
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Icon(
+                                        Icons.arrow_drop_down,
+                                        color: Colors.grey,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: GestureDetector(
-                              onTap: _showYearPicker,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                  horizontal: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.calendar_today,
-                                          color: Colors.green,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          _selectedYear.toString(),
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.black87,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: _showYearPicker,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                    horizontal: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.calendar_today,
+                                            color: Colors.green,
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                    const Icon(
-                                      Icons.arrow_drop_down,
-                                      color: Colors.grey,
-                                    ),
-                                  ],
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            _selectedYear.toString(),
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Icon(
+                                        Icons.arrow_drop_down,
+                                        color: Colors.grey,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -540,9 +573,11 @@ class _UserReportPageState extends State<UserReportPage> {
                                     _buildReportItem(
                                       icon: Icons.access_time,
                                       color: Colors.orange[700]!,
-                                      label: "Total Hours",
-                                      value: _currentReport?.totalHours ??
-                                          '00:00:00',
+                                      label: "Worked",
+                                      value: _formatDuration(
+                                        _currentReport?.totalHours ??
+                                            '00:00:00',
+                                      ),
                                     ),
                                     // const SizedBox(height: 16),
                                     // _buildReportItem(
@@ -574,10 +609,11 @@ class _UserReportPageState extends State<UserReportPage> {
                                     _buildReportItem(
                                       icon: Icons.lunch_dining,
                                       color: Colors.blueGrey,
-                                      label: "Total Lunch Duration",
-                                      value:
-                                          _currentReport?.totalLunchDuration ??
-                                              '00:00:00',
+                                      label: "Break",
+                                      value: _formatDuration(
+                                        _currentReport?.totalLunchDuration ??
+                                            '00:00:00',
+                                      ),
                                     ),
                                   ],
                                 ),

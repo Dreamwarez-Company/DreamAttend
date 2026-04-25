@@ -79,14 +79,26 @@ class _CreateEmployeePageState extends State<CreateEmployeePage> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+Future<void> _pickImage() async {
+  final picker = ImagePicker();
+  XFile? pickedFile;
+
+  try {
+    pickedFile = await picker.pickImage(source: ImageSource.gallery);
+  } catch (e) {
     if (!mounted) return;
+    errorSnackBar('Error', 'Unable to select image. Please try again.');
+    return;
+  }
+
+  if (!mounted) return;
+
+  if (pickedFile != null) {
     setState(() {
       _imageFile = pickedFile;
     });
   }
+}
 
   Future<void> _createEmployee() async {
     if (!_formKey.currentState!.validate() || _isSubmitting) return;
@@ -103,28 +115,30 @@ class _CreateEmployeePageState extends State<CreateEmployeePage> {
       }
 
       final employeeData = {
-        'name': _nameController.text,
+        'name': _nameController.text.trim(),
         'employee_id': _employeeIdController.text.isEmpty
             ? null
-            : _employeeIdController.text,
-        'job_title': _jobTitleController.text,
-        'dob': _dobController.text,
-        'mobile': _mobileController.text,
-        'email': _emailController.text,
-        'address': _addressController.text,
+            : _employeeIdController.text.trim(),
+         'dob': _dobController.text,
+        'job_title': _jobTitleController.text.trim(),
+        'mobile': _mobileController.text.trim(),
+        'email': _emailController.text.trim(),
+        'address': _addressController.text.trim(),
         'role_type': _roleTypeOptions[_selectedRoleType!]!,
         'gender': _genderOptions[_selectedGender!]!,
         if (imageBase64 != null) 'image': imageBase64,
-        'password': _passwordController.text,
+        'password': _passwordController.text.trim(),
+
       };
 
       await _employeeService.createEmployee(employeeData);
       if (!mounted) return;
-      successSnackBar('Success', 'Employee created successfully!');
+      successSnackBar('Success', 'Employee created successfully.');
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      errorSnackBar('Error', 'Error: $e');
+      // errorSnackBar('Error', 'Error: $e');
+      errorSnackBar('Error', 'Failed to create employee. Please try again.');
     } finally {
       if (!mounted) return;
       setState(() {
@@ -156,7 +170,16 @@ class _CreateEmployeePageState extends State<CreateEmployeePage> {
                     decoration: const InputDecoration(
                       labelText: 'Full Name',
                     ),
-                    validator: (value) => value!.isEmpty ? 'Required' : null,
+                    // validator: (value) => value!.isEmpty ? 'Required' : null,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Full name is required';
+                            }
+                            if (value.trim().length < 3) {
+                              return 'Enter a valid name';
+                            }
+                            return null;
+                          }
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -214,9 +237,12 @@ class _CreateEmployeePageState extends State<CreateEmployeePage> {
                     decoration: const InputDecoration(labelText: 'Email'),
                     validator: (value) {
                       if (value!.isEmpty) return 'Required';
-                      if (!value.toLowerCase().endsWith('@dreamwarez.in')) {
-                        return 'Email must end with @dreamwarez.in';
-                      }
+                      // if (!value.toLowerCase().endsWith('@dreamwarez.in')) {
+                      //   return 'Email must end with @dreamwarez.in';
+                      // }
+                      if (!RegExp(r'^[^@]+@dreamwarez\.in$').hasMatch(value)) {
+                                  return 'Enter a valid company email';
+                                }
                       return null;
                     },
                   ),
@@ -227,7 +253,12 @@ class _CreateEmployeePageState extends State<CreateEmployeePage> {
                     decoration: const InputDecoration(
                       labelText: 'Password',
                     ),
-                    validator: (value) => value!.isEmpty ? 'Required' : null,
+                    // validator: (value) => value!.isEmpty ? 'Required' : null,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) return 'Password is required';
+                            if (value.length < 6) return 'Minimum 6 characters required';
+                            return null;
+                          }
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -295,8 +326,9 @@ class _CreateEmployeePageState extends State<CreateEmployeePage> {
                             fontSize: 12.0,
                           ),
                         ),
-                        ElevatedButton(
-                          onPressed: _pickImage,
+                      
+                          ElevatedButton(
+                                 onPressed: _isSubmitting ? null : _pickImage,
                           style: ElevatedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 36.0),
                             padding: EdgeInsets.zero,
@@ -313,39 +345,109 @@ class _CreateEmployeePageState extends State<CreateEmployeePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  // Row(
+                  //   mainAxisAlignment: MainAxisAlignment.end,
+                  //   children: [
+                  //     TextButton(
+                  //       onPressed: () => Navigator.pop(context),
+                  //       style: ButtonStyle(
+                  //         backgroundColor:
+                  //             WidgetStateProperty.all<Color>(Colors.red),
+                  //         foregroundColor:
+                  //             WidgetStateProperty.all<Color>(Colors.white),
+                  //       ),
+                  //       child: const Text('Cancel'),
+                  //     ),
+                  //     const SizedBox(width: 10),
+                  //     ElevatedButton(
+                  //       onPressed: _isSubmitting ? null : _createEmployee,
+                  //       style: ElevatedButton.styleFrom(
+                  //         backgroundColor: const Color.fromARGB(255, 24, 128, 54),
+                  //         foregroundColor: Colors.white,
+                  //       ),
+                  //       child: _isSubmitting
+                  //           ? const SizedBox(
+                  //               width: 18,
+                  //               height: 18,
+                  //               child: CircularProgressIndicator(
+                  //                 strokeWidth: 2,
+                  //                 color: Colors.white,
+                  //               ),
+                  //             )
+                  //           : const Text('Create Employee'),
+                  //     ),
+                  //   ],
+                  // ),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: ButtonStyle(
-                          backgroundColor:
-                              WidgetStateProperty.all<Color>(Colors.red),
-                          foregroundColor:
-                              WidgetStateProperty.all<Color>(Colors.white),
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: 
+                            // OutlinedButton(
+                            //   onPressed: () => Navigator.pop(context),
+                            //   style: OutlinedButton.styleFrom(
+                            //     // backgroundColor: const Color.fromARGB(255, 198, 46, 69), 
+                            //     backgroundColor: Colors.red,
+
+                            //     side: BorderSide(color: Colors.grey.shade400),
+                            //     shape: RoundedRectangleBorder(
+                            //       borderRadius: BorderRadius.circular(6),
+                                   
+                            //     ),
+                            //   ),
+                            //   child: const Text(
+                            //     'Cancel',
+                            //     style: TextStyle(color: Colors.black87),
+                            //   ),
+                            // ),
+                                  OutlinedButton(
+                                      onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                                      style: OutlinedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                        side: BorderSide(color: Colors.red),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                          color: Colors.white, // 🔥 FIXED
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    )
+                          ),
                         ),
-                        child: const Text('Cancel'),
-                      ),
-                      const SizedBox(width: 10),
-                      ElevatedButton(
-                        onPressed: _isSubmitting ? null : _createEmployee,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color.fromARGB(255, 24, 128, 54),
-                          foregroundColor: Colors.white,
-                        ),
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _isSubmitting ? null : _createEmployee,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF188036),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6), 
                                 ),
-                              )
-                            : const Text('Create'),
-                      ),
-                    ],
-                  ),
+                                elevation: 1,
+                              ),
+                              child: _isSubmitting
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text('Create Employee'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
                 ],
               ),
             ),

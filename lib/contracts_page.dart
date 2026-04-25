@@ -1,12 +1,18 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '/services/employee_service.dart';
 import '/services/contract_service.dart';
+import '/services/api_service.dart';
 import '/models/employee.dart';
 import '/models/contract_model.dart';
+import '/models/salary_structure.dart';
+import '/controller/app_constants.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'utils/app_layout.dart';
 import 'widget/search_filter_bar.dart';
+import 'utils/app_layout.dart';
 
 class ContractsPage extends StatefulWidget {
   final bool showDialogOnLoad;
@@ -20,8 +26,16 @@ class ContractsPage extends StatefulWidget {
 class _ContractsPageState extends State<ContractsPage> {
   final EmployeeService _employeeService = EmployeeService();
   final ContractService _contractService = ContractService();
+  final ApiService _apiService = ApiService();
+  static const Map<String, int> _contractTypeIdsByCategory = {
+    'Permanent': 1,
+    'Temporary': 2,
+    'Intern': 3,
+  };
+  static const int _defaultResourceCalendarId = 1;
   List<Employee> _employees = [];
   List<Contract> _contracts = [];
+  List<SalaryStructure> _salaryStructures = [];
   String? _selectedEmployee;
   int? _selectedEmployeeId;
   DateTime? _selectedDate;
@@ -47,6 +61,7 @@ class _ContractsPageState extends State<ContractsPage> {
   final _formKey = GlobalKey<FormState>();
   DateTime _focusedDay = DateTime.now();
   bool _isLoading = true;
+  bool _isSubmitting = false;
 
   List<Contract> get _filteredContracts {
     final query = _searchController.text.trim().toLowerCase();
@@ -80,11 +95,238 @@ class _ContractsPageState extends State<ContractsPage> {
     });
   }
 
+  void _logError(String context, Object error) {
+    debugPrint('$context: $error');
+  }
+
+  String _userFriendlyErrorMessage(
+    Object error, {
+    String fallback = 'Something went wrong. Please try again.',
+  }) {
+    final message = error.toString().toLowerCase();
+
+    if (message.contains('timeout')) {
+      return 'The request timed out. Please try again.';
+    }
+    if (message.contains('failed host lookup') ||
+        message.contains('socket') ||
+        message.contains('network') ||
+        message.contains('connection')) {
+      return 'No internet connection. Please check your network and try again.';
+    }
+    if (message.contains('session expired') ||
+        message.contains('no valid session') ||
+        message.contains('log in')) {
+      return 'Your session has expired. Please log in again.';
+    }
+
+    return fallback;
+  }
+
+  void _showStandardError(
+    String context,
+    Object error, {
+    String title = 'Error',
+    String fallback = 'Something went wrong. Please try again.',
+  }) {
+    _logError(context, error);
+    if (!mounted) return;
+    errorSnackBar(title, _userFriendlyErrorMessage(error, fallback: fallback));
+  }
+
+  Employee? _findEmployeeByName(String? name) {
+    if (name == null) return null;
+
+    for (final employee in _employees) {
+      if (employee.name == name) {
+        return employee;
+      }
+    }
+
+    return null;
+  }
+
+  int? _resolveSalaryStructureId(String? structureName) {
+    if (structureName == null) return null;
+
+    for (final structure in _salaryStructures) {
+      if (structure.name == structureName) {
+        return structure.id;
+      }
+    }
+
+    return null;
+  }
+
+  int? _resolveContractTypeId(String? category) {
+    return _contractTypeIdsByCategory[category];
+  }
+
+  Future<void> _fetchSalaryStructures() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sessionId = prefs.getString('sessionId');
+
+      if (sessionId == null || sessionId.isEmpty) {
+        throw Exception('No valid session found. Please log in.');
+      }
+
+      final response = await _apiService.authenticatedGet(
+        AppConstants.salaryStructureEndpoint,
+        sessionId: sessionId,
+        queryParams: const {
+          'limit': '100',
+          'offset': '0',
+          'domain': '[]',
+        },
+      );
+
+      final jsonData = jsonDecode(response.body);
+      if (jsonData['status'] != 'success' || jsonData['data'] is! List) {
+        throw Exception('Unexpected salary structure response');
+      }
+
+      final structures = (jsonData['data'] as List)
+          .map((item) => SalaryStructure.fromJson(item))
+          .where((structure) => structure.name.trim().isNotEmpty)
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _salaryStructures = structures;
+        if (_selectedSalaryStructure != null &&
+            _resolveSalaryStructureId(_selectedSalaryStructure) == null) {
+          _selectedSalaryStructure = null;
+        }
+      });
+    } catch (e) {
+      _showStandardError(
+        'Fetch salary structures error',
+        e,
+        fallback: 'Unable to load salary structures right now.',
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> _buildContractPayload() async {
+    final employeeId = _selectedEmployeeId;
+    final employeeName = _selectedEmployee;
+    final structId = _resolveSalaryStructureId(_selectedSalaryStructure);
+    final typeId = _resolveContractTypeId(_selectedCategory);
+
+    if (employeeId == null || employeeName == null) {
+      throw StateError('Please select a valid employee.');
+    }
+    if (structId == null) {
+      throw StateError('Please select a valid salary structure.');
+    }
+    if (typeId == null) {
+      throw StateError('Please select a valid employee category.');
+    }
+
+    final contractData = {
+      'employee_id': employeeId,
+      'name': 'Contract for $employeeName',
+      'date_start': _selectedDate != null
+          ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
+          : null,
+      'date_end': _selectedEndDate != null
+          ? DateFormat('yyyy-MM-dd').format(_selectedEndDate!)
+          : null,
+      'wage': double.tryParse(_wageController.text) ?? 0.0,
+      'schedule_pay': _selectedSchedule ?? 'monthly',
+      'hra': double.tryParse(_hraController.text) ?? 0.0,
+      'da': double.tryParse(_daController.text) ?? 0.0,
+      'travel_allowance': double.tryParse(_travelAllowanceController.text) ?? 0.0,
+      'meal_allowance': double.tryParse(_mealAllowanceController.text) ?? 0.0,
+      'medical_allowance':
+          double.tryParse(_medicalAllowanceController.text) ?? 0.0,
+      'overtime_rate': double.tryParse(_overtimeRateController.text) ?? 0.0,
+      'other_allowance': double.tryParse(_otherAllowanceController.text) ?? 0.0,
+      'state': 'draft',
+      'struct_id': structId,
+      // TODO: Replace this fallback once calendar config is exposed by the API.
+      'resource_calendar_id': _defaultResourceCalendarId,
+      'type_id': typeId,
+    };
+
+    debugPrint('Creating contract payload: $contractData');
+    return contractData;
+  }
+
+  Future<void> _submitContract() async {
+    if (_isSubmitting || !_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_employees.isEmpty) {
+      errorSnackBar(
+        'Error',
+        'No employees are available. Please add an employee first.',
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final latestContracts = await _contractService.getContracts();
+      if (!mounted) return;
+
+      final alreadyExists = _hasDuplicateContract(
+        latestContracts,
+        employeeId: _selectedEmployeeId,
+        employeeName: _selectedEmployee,
+      );
+
+      if (alreadyExists) {
+        setState(() {
+          _contracts = latestContracts;
+        });
+        errorSnackBar(
+          'Oops!',
+          'Contract already exists for this employee.',
+        );
+        return;
+      }
+
+      final contractData = await _buildContractPayload();
+      await _contractService.createContract(contractData);
+      if (!mounted) return;
+
+      setState(() {
+        _clearForm();
+      });
+      successSnackBar(
+        'Success',
+        'Contract created successfully',
+      );
+
+      Navigator.pop(context);
+      await _fetchContracts();
+    } catch (e) {
+      _showStandardError(
+        'Create contract error',
+        e,
+        fallback: 'Unable to create the contract right now.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _fetchEmployees();
     _fetchContracts();
+    _fetchSalaryStructures();
     if (widget.showDialogOnLoad) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -101,8 +343,11 @@ class _ContractsPageState extends State<ContractsPage> {
         _employees = employees;
       });
     } catch (e) {
-      if (!mounted) return;
-      errorSnackBar('Error', 'Failed to fetch employees: $e');
+      _showStandardError(
+        'Fetch employees error',
+        e,
+        fallback: 'Unable to load employees right now.',
+      );
     }
   }
 
@@ -119,7 +364,11 @@ class _ContractsPageState extends State<ContractsPage> {
       setState(() {
         _isLoading = false;
       });
-      errorSnackBar('Error', 'Failed to fetch contracts: $e');
+      _showStandardError(
+        'Fetch contracts error',
+        e,
+        fallback: 'Unable to load contracts right now.',
+      );
     }
   }
 
@@ -130,8 +379,11 @@ class _ContractsPageState extends State<ContractsPage> {
       successSnackBar('Success', 'Contract set to running state successfully');
       await _fetchContracts();
     } catch (e) {
-      if (!mounted) return;
-      errorSnackBar('Error', 'Failed to set contract to running state: $e');
+      _showStandardError(
+        'Set contract running error',
+        e,
+        fallback: 'Unable to update the contract status right now.',
+      );
     }
   }
 
@@ -338,8 +590,11 @@ class _ContractsPageState extends State<ContractsPage> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
-      errorSnackBar('Error', 'Failed to fetch contract details: $e');
+      _showStandardError(
+        'Fetch contract details error',
+        e,
+        fallback: 'Unable to load contract details right now.',
+      );
     }
   }
 
@@ -475,7 +730,7 @@ class _ContractsPageState extends State<ContractsPage> {
     );
   }
 
-  Widget _buildAdvantageField({
+  Widget _buildAllowanceField({
     required String label,
     required TextEditingController controller,
   }) {
@@ -583,12 +838,18 @@ class _ContractsPageState extends State<ContractsPage> {
                                   );
                                 }).toList(),
                                 onChanged: (value) {
+                                  final employee = _findEmployeeByName(value);
                                   setState(() {
                                     _selectedEmployee = value;
-                                    _selectedEmployeeId = _employees
-                                        .firstWhere((e) => e.name == value)
-                                        .id;
+                                    _selectedEmployeeId = employee?.id;
                                   });
+
+                                  if (value != null && employee == null) {
+                                    errorSnackBar(
+                                      'Error',
+                                      'Selected employee could not be found.',
+                                    );
+                                  }
                                 },
                                 validator: (value) => value == null
                                     ? 'Please select an employee'
@@ -724,25 +985,28 @@ class _ContractsPageState extends State<ContractsPage> {
                                 value: _selectedSalaryStructure,
                                 decoration: _buildInputDecoration(
                                     'Select salary structure'),
-                                items: ['Fixed', 'Hourly', 'Commission']
-                                    .map((structure) {
-                                  return DropdownMenuItem<String>(
-                                    value: structure,
-                                    child: Text(
-                                      structure,
-                                      style: const TextStyle(
-                                        color: Color(0xFF073850),
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedSalaryStructure = value;
-                                  });
-                                },
+                                items: _salaryStructures.map((structure) {
+                                   return DropdownMenuItem<String>(
+                                     value: structure.name,
+                                     child: Text(
+                                       structure.name,
+                                       style: const TextStyle(
+                                         color: Color(0xFF073850),
+                                       ),
+                                     ),
+                                   );
+                                 }).toList(),
+                                onChanged: _salaryStructures.isEmpty
+                                    ? null
+                                    : (value) {
+                                   setState(() {
+                                     _selectedSalaryStructure = value;
+                                   });
+                                 },
                                 validator: (value) => value == null
-                                    ? 'Please select a salary structure'
+                                    ? _salaryStructures.isEmpty
+                                        ? 'Salary structures are unavailable'
+                                        : 'Please select a salary structure'
                                     : null,
                                 borderRadius: BorderRadius.circular(12),
                                 dropdownColor: Colors.white,
@@ -801,31 +1065,31 @@ class _ContractsPageState extends State<ContractsPage> {
                                   ),
                             ),
                             const SizedBox(height: 16),
-                            _buildAdvantageField(
+                            _buildAllowanceField(
                               label: 'HRA',
                               controller: _hraController,
                             ),
-                            _buildAdvantageField(
+                            _buildAllowanceField(
                               label: 'DA',
                               controller: _daController,
                             ),
-                            _buildAdvantageField(
+                            _buildAllowanceField(
                               label: 'Travel Allowance',
                               controller: _travelAllowanceController,
                             ),
-                            _buildAdvantageField(
+                            _buildAllowanceField(
                               label: 'Meal Allowance',
                               controller: _mealAllowanceController,
                             ),
-                            _buildAdvantageField(
+                            _buildAllowanceField(
                               label: 'Medical Allowance',
                               controller: _medicalAllowanceController,
                             ),
-                            _buildAdvantageField(
+                            _buildAllowanceField(
                               label: 'Overtime Rate',
                               controller: _overtimeRateController,
                             ),
-                            _buildAdvantageField(
+                            _buildAllowanceField(
                               label: 'Other Allowance',
                               controller: _otherAllowanceController,
                             ),
@@ -859,7 +1123,9 @@ class _ContractsPageState extends State<ContractsPage> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {
+                    onPressed: _isSubmitting
+                        ? null
+                        : () {
                       Navigator.pop(context);
                       if (!mounted) return;
                       setState(() {
@@ -886,95 +1152,7 @@ class _ContractsPageState extends State<ContractsPage> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () async {
-                      if (_formKey.currentState!.validate()) {
-                        try {
-                          final latestContracts =
-                              await _contractService.getContracts();
-                          if (!mounted) return;
-
-                          final alreadyExists = _hasDuplicateContract(
-                            latestContracts,
-                            employeeId: _selectedEmployeeId,
-                            employeeName: _selectedEmployee,
-                          );
-
-                          if (alreadyExists) {
-                            setState(() {
-                              _contracts = latestContracts;
-                            });
-                            errorSnackBar(
-                              'Oops!',
-                              'Contract already exists for this employee',
-                            );
-                            return;
-                          }
-                          final contractData = {
-                            'employee_id': _selectedEmployeeId,
-                            'name': 'Contract for $_selectedEmployee',
-                            'date_start': _selectedDate != null
-                                ? DateFormat('yyyy-MM-dd')
-                                    .format(_selectedDate!)
-                                : null,
-                            'date_end': _selectedEndDate != null
-                                ? DateFormat('yyyy-MM-dd')
-                                    .format(_selectedEndDate!)
-                                : null,
-                            'wage':
-                                double.tryParse(_wageController.text) ?? 0.0,
-                            'schedule_pay': _selectedSchedule ?? 'monthly',
-                            'hra': double.tryParse(_hraController.text) ?? 0.0,
-                            'da': double.tryParse(_daController.text) ?? 0.0,
-                            'travel_allowance': double.tryParse(
-                                    _travelAllowanceController.text) ??
-                                0.0,
-                            'meal_allowance': double.tryParse(
-                                    _mealAllowanceController.text) ??
-                                0.0,
-                            'medical_allowance': double.tryParse(
-                                    _medicalAllowanceController.text) ??
-                                0.0,
-                            'overtime_rate':
-                                double.tryParse(_overtimeRateController.text) ??
-                                    0.0,
-                            'other_allowance': double.tryParse(
-                                    _otherAllowanceController.text) ??
-                                0.0,
-                            'state': 'draft',
-                            'struct_id': _selectedSalaryStructure == 'Fixed'
-                                ? 1
-                                : _selectedSalaryStructure == 'Hourly'
-                                    ? 2
-                                    : 3,
-                            'resource_calendar_id': 1,
-                            'type_id': _selectedCategory == 'Permanent'
-                                ? 1
-                                : _selectedCategory == 'Temporary'
-                                    ? 2
-                                    : 3,
-                          };
-                          await _contractService.createContract(contractData);
-                          if (!mounted) return;
-                          setState(() {
-                            _clearForm();
-                          });
-                          successSnackBar(
-                            'Success',
-                            'Contract created successfully',
-                          );
-
-                          Navigator.pop(context);
-                          await _fetchContracts();
-                        } catch (e) {
-                          if (!mounted) return;
-                          errorSnackBar(
-                            'Error',
-                            'Failed to create contract: ${e.toString()}',
-                          );
-                          Navigator.pop(context);
-                        }
-                      }
-                    },
+                    onPressed: _isSubmitting ? null : _submitContract,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 7, 56, 80),
                       foregroundColor: Colors.white,
@@ -984,13 +1162,23 @@ class _ContractsPageState extends State<ContractsPage> {
                       ),
                       elevation: 2,
                     ),
-                    child: const Text(
-                      'Create Contract',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Create Contract',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ),
               ],

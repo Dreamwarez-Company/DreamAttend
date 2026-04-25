@@ -56,7 +56,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         _employees = employees;
       });
     } catch (e) {
-      _showNotification('Failed to load employees: $e', isError: true);
+      _showNotification('Failed to load employees. Please try again.', isError: true);
     } finally {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -85,54 +85,87 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     }
   }
 
-  Future<void> _submitTask() async {
-    if (_selectedEmployee == null ||
-        _taskNameController.text.isEmpty ||
-        deadline == null) {
-      _showNotification('Please fill all required fields', isError: true);
-      return;
-    }
+ Future<void> _submitTask() async {
+  // 🔴 1. Trim inputs
+  final taskName = _taskNameController.text.trim();
+  final description = _descriptionController.text.trim();
+
+  // 🔴 2. Required field validation
+  if (_selectedEmployee == null) {
+    _showNotification('Please select an employee.', isError: true);
+    return;
+  }
+
+  if (taskName.isEmpty) {
+    _showNotification('Task name is required.', isError: true);
+    return;
+  }
+
+  if (deadline == null) {
+    _showNotification('Please select a deadline.', isError: true);
+    return;
+  }
+
+  // 🔴 3. Date validation
+  if (startDate != null && deadline!.isBefore(startDate!)) {
+    _showNotification('Deadline cannot be before start date.', isError: true);
+    return;
+  }
+
+  // 🔴 4. Optional: description length check
+  if (description.length > 200) {
+    _showNotification('Description should be under 200 characters.', isError: true);
+    return;
+  }
+
+  if (!mounted) return;
+  setState(() => _isLoading = true);
+
+  try {
+    final selectedEmployee = _employees.firstWhere(
+      (emp) => emp.id.toString() == _selectedEmployee,
+      orElse: () => throw Exception('Employee not found'),
+    );
+
+    final task = TaskRequest(
+      taskId: 0,
+      employeeId: selectedEmployee.id.toString(),
+      assignBy: widget.currentUserName,
+      name: taskName, // ✅ trimmed
+      startDate: startDate != null
+          ? DateFormat('yyyy-MM-dd').format(startDate!)
+          : null,
+      endDate: null,
+      deadline: DateFormat('yyyy-MM-dd').format(deadline!),
+      description: description.isEmpty ? null : description, // ✅ clean
+      state: 'pending',
+      assignedToName: selectedEmployee.name,
+      assignedByName: widget.currentUserName,
+    );
+
+    await _taskService.createTask(task);
 
     if (!mounted) return;
-    setState(() => _isLoading = true);
 
-    try {
-      final selectedEmployee = _employees.firstWhere(
-        (emp) => emp.id.toString() == _selectedEmployee,
-        orElse: () => throw Exception('Selected employee not found'),
-      );
+    _showNotification('Task created successfully.');
 
-      final task = TaskRequest(
-        taskId: 0,
-        employeeId: selectedEmployee.id.toString(),
-        assignBy: widget.currentUserName,
-        name: _taskNameController.text,
-        startDate: startDate != null
-            ? DateFormat('yyyy-MM-dd').format(startDate!)
-            : null,
-        endDate: null,
-        deadline: DateFormat('yyyy-MM-dd').format(deadline!),
-        description: _descriptionController.text,
-        state: 'pending',
-        assignedToName: selectedEmployee.name,
-        assignedByName: widget.currentUserName,
-      );
+    _clearForm();
+    widget.onTaskCreated();
+    Navigator.pop(context);
 
-      await _taskService.createTask(task);
-      _showNotification('Task created successfully!');
+  } catch (e) {
+    if (!mounted) return;
 
-      if (!mounted) return;
-      _clearForm();
-      widget.onTaskCreated();
-      Navigator.pop(context);
-    } catch (e) {
-      _showNotification('You don\'t have access to create tasks',
-          isError: true);
-    } finally {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-    }
+    // 🔴 5. Clean generic error message
+    _showNotification(
+      'Failed to create task. Please try again.',
+      isError: true,
+    );
+  } finally {
+    if (!mounted) return;
+    setState(() => _isLoading = false);
   }
+}
 
   void _showNotification(String message, {bool isError = false}) {
     if (!mounted) return;

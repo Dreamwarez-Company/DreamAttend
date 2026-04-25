@@ -75,6 +75,7 @@ class _PayslipPageState extends State<PayslipPage> {
     try {
       developer.log('Fetching payslips', name: 'PayslipPage');
       final payslips = await _payslipService.fetchPayslips();
+      if (!mounted) return;
       setState(() {
         _payslips = payslips;
         _isLoading = false;
@@ -84,7 +85,8 @@ class _PayslipPageState extends State<PayslipPage> {
     } catch (e) {
       developer.log('Failed to fetch payslips: $e',
           name: 'PayslipPage', error: e);
-      _showSnackBar('Failed to fetch payslips: $e');
+      // _showSnackBar('Failed to fetch payslips: $e');
+      _showSnackBar('Failed to fetch payslips. Please try again.');
       setState(() => _isLoading = false);
     }
   }
@@ -95,7 +97,7 @@ class _PayslipPageState extends State<PayslipPage> {
           name: 'PayslipPage');
       return;
     }
-
+    if (!mounted) return;
     setState(() {
       _isDetailLoading[id] = true;
     });
@@ -103,6 +105,7 @@ class _PayslipPageState extends State<PayslipPage> {
 
     try {
       final detailedPayslip = await _payslipService.fetchPayslipDetails(id);
+      if (!mounted) return;
       setState(() {
         _detailedPayslips[id] = detailedPayslip;
         _isDetailLoading[id] = false;
@@ -110,6 +113,7 @@ class _PayslipPageState extends State<PayslipPage> {
       developer.log('Payslip details fetched successfully for ID: $id',
           name: 'PayslipPage');
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isDetailLoading[id] = false;
       });
@@ -120,6 +124,7 @@ class _PayslipPageState extends State<PayslipPage> {
   }
 
   Future<void> _fetchContracts(int employeeId) async {
+    if (!mounted) return;
     setState(() {
       _isContractsLoading = true;
       _contracts = [];
@@ -140,7 +145,7 @@ class _PayslipPageState extends State<PayslipPage> {
         return contractEmployeeId == employeeId ||
             contractEmployeeName == _selectedEmployeeName;
       }).toList();
-
+      if (!mounted) return;
       setState(() {
         _contracts = filteredContracts;
         _isContractsLoading = false;
@@ -157,6 +162,7 @@ class _PayslipPageState extends State<PayslipPage> {
           'Contracts fetched successfully, count: ${filteredContracts.length}',
           name: 'PayslipPage');
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isContractsLoading = false;
       });
@@ -172,6 +178,7 @@ class _PayslipPageState extends State<PayslipPage> {
   }
 
   void _clearForm() {
+    if (!mounted) return;
     setState(() {
       _selectedEmployeeName = null;
       _selectedEmployeeId = null;
@@ -190,6 +197,22 @@ class _PayslipPageState extends State<PayslipPage> {
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedEmployeeId == null ||
+          _selectedDateFrom == null ||
+          _selectedDateTo == null ||
+          _selectedContractId == null) {
+        _showSnackBar('Please fill all required fields', color: Colors.red);
+        return;
+      }
+
+      if (_selectedDateTo!.isBefore(_selectedDateFrom!)) {
+        _showSnackBar(
+          'End date must be after start date',
+          color: Colors.red,
+        );
+        return;
+      }
+
       double? advanceDeduction;
       if (_advanceDeductionController.text.isNotEmpty) {
         advanceDeduction = double.tryParse(_advanceDeductionController.text);
@@ -243,7 +266,7 @@ class _PayslipPageState extends State<PayslipPage> {
           totalAdvancePay: newPayslip.totalAdvancePay,
           remainingAdvanceBalance: newPayslip.remainingAdvanceBalance,
         );
-
+         if (!mounted) return;
         setState(() {
           _payslips.add(createdPayslip);
           _selectedEmployeeName = null;
@@ -362,6 +385,7 @@ class _PayslipPageState extends State<PayslipPage> {
                         ElevatedButton(
                           onPressed: () {
                             if (tempSelectedDate != null) {
+                              if (!mounted) return;
                               setState(() {
                                 _focusedDay = tempFocusedDay;
                                 if (isFromDate) {
@@ -547,6 +571,7 @@ class _PayslipPageState extends State<PayslipPage> {
                                 onChanged: (val) async {
                                   final selectedEmployee = _employees
                                       .firstWhere((e) => e.name == val);
+                                      if (!mounted) return;
                                   setState(() {
                                     _selectedEmployeeName = val;
                                     _selectedEmployeeId = selectedEmployee.id;
@@ -574,6 +599,7 @@ class _PayslipPageState extends State<PayslipPage> {
                                         );
                                       }).toList(),
                                       onChanged: (val) {
+                                        if (!mounted) return;
                                         setState(() {
                                           _selectedContractId = val;
                                         });
@@ -671,6 +697,7 @@ class _PayslipPageState extends State<PayslipPage> {
                       controller: _searchController,
                       hintText: 'Search by employee name...',
                       onChanged: () {
+                        if (!mounted) return;
                         setState(() {
                           _searchQuery = _searchController.text.toLowerCase();
                         });
@@ -691,10 +718,8 @@ class _PayslipPageState extends State<PayslipPage> {
                                     .toList();
                             if (filteredPayslips.isEmpty) {
                               return const Center(
-                                child: Text(
-                                  'No payslips found',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
+                                child: 
+                                Text('No payslips found',style: TextStyle(color: Colors.grey),),
                               );
                             }
                             return ListView.builder(
@@ -775,6 +800,7 @@ class _PayslipPageState extends State<PayslipPage> {
                                                           PayslipDetailsPage(
                                                         payslip: detailedP,
                                                         onCompute: (newLines) {
+                                                          if (!mounted) return;
                                                           setState(() {
                                                             _payslips =
                                                                 _payslips.map(
@@ -882,6 +908,7 @@ class _PayslipPageState extends State<PayslipPage> {
                                                           );
                                                         },
                                                         onConfirm: () {
+                                                          if (!mounted) return;
                                                           setState(() {
                                                             _payslips = _payslips
                                                                 .map((payslip) => payslip.id == p.id
@@ -1057,6 +1084,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
   }
 
   Future<void> _fetchPayslipDetails() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingDetails = true;
     });
@@ -1068,6 +1096,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
     try {
       final details =
           await _payslipService.fetchPayslipWorkedDaysInputs(widget.payslip.id);
+          if (!mounted) return;
       setState(() {
         _workedDays = details['worked_days'];
         _inputs = details['inputs'];
@@ -1079,6 +1108,8 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
           'Payslip details fetched successfully: ${_workedDays.length} worked days, ${_inputs.length} inputs',
           name: 'PayslipDetailsPage');
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         _isLoadingDetails = false;
       });
@@ -1101,7 +1132,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
       );
       return;
     }
-
+     if (!mounted) return;
     setState(() {
       _isComputing = true;
     });
@@ -1111,6 +1142,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
     try {
       final computedLines =
           await _payslipService.computePayslipSheet(_currentPayslip.id);
+          if (!mounted) return;
       setState(() {
         _currentPayslip = _currentPayslip.copyWith(lineIds: computedLines);
         _hasComputed = true;
@@ -1126,6 +1158,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
           name: 'PayslipDetailsPage', error: e);
       _showSnackBar('Error computing payslip: $e');
     } finally {
+      if (!mounted) return;
       setState(() {
         _isComputing = false;
       });
@@ -1144,7 +1177,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
       );
       return;
     }
-
+    if (!mounted) return;
     setState(() {
       _isConfirming = true;
     });
@@ -1153,6 +1186,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
 
     try {
       await _payslipService.confirmPayslip(_currentPayslip.id);
+      if (!mounted) return;
       setState(() {
         _currentPayslip = _currentPayslip.copyWith(state: 'done');
       });
@@ -1168,6 +1202,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
         final employeeNameEnd = e.toString().indexOf('for', employeeNameStart);
         final employeeName =
             e.toString().substring(employeeNameStart, employeeNameEnd).trim();
+            if (!mounted) return;
         setState(() {
           _currentPayslip = _currentPayslip.copyWith(state: 'done');
         });
@@ -1184,6 +1219,7 @@ class _PayslipDetailsPageState extends State<PayslipDetailsPage> {
         _showSnackBar('Error confirming payslip: $e');
       }
     } finally {
+      if (!mounted) return;
       setState(() {
         _isConfirming = false;
       });

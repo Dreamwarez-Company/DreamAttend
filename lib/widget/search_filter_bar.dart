@@ -61,7 +61,10 @@ class SearchFilterBar extends StatelessWidget {
 
     return Padding(
       padding: padding,
-      child: TextField(
+      child: 
+      // TextField
+      TextFormField 
+      (
         controller: controller,
         onChanged: (_) => onChanged(),
         decoration: InputDecoration(

@@ -8,6 +8,8 @@ class LeaveRequest {
   final String? leaveType;
   final String? halfDayType;
   final String? leaveSubType;
+  final DateTime? parsedStartDate;
+  final DateTime? parsedEndDate;
 
   LeaveRequest({
     this.id,
@@ -19,6 +21,8 @@ class LeaveRequest {
     this.leaveType,
     this.halfDayType,
     this.leaveSubType,
+    this.parsedStartDate,
+    this.parsedEndDate,
   });
 
   Map<String, dynamic> toJson() => {
@@ -36,11 +40,39 @@ class LeaveRequest {
   factory LeaveRequest.fromJson(Map<String, dynamic> json) {
     print('Parsing JSON: $json');
 
+    DateTime? parseDateValue(dynamic date) {
+      if (date == null) return null;
+      if (date is DateTime) return date;
+      if (date is String) {
+        final trimmedDate = date.trim();
+        if (trimmedDate.isEmpty) return null;
+
+        try {
+          if (trimmedDate.contains('-') && trimmedDate.split('-').length == 3) {
+            final parts = trimmedDate.split('-');
+            final isDisplayFormat =
+                parts[0].length == 2 && parts[1].length == 2 && parts[2].length == 4;
+
+            if (isDisplayFormat) {
+              return DateTime.tryParse('${parts[2]}-${parts[1]}-${parts[0]}');
+            }
+          }
+
+          return DateTime.tryParse(trimmedDate);
+        } catch (_) {
+          return null;
+        }
+      }
+      return null;
+    }
+
     String formatDate(dynamic date) {
       if (date == null) return '';
-      if (date is DateTime) return date.toString();
-      if (date is String) return date;
-      return date.toString();
+      final parsedDate = parseDateValue(date);
+      if (parsedDate == null) {
+        return date.toString();
+      }
+      return _formatDisplayDate(parsedDate);
     }
 
     String? safeString(dynamic value, String fieldName) {
@@ -69,7 +101,13 @@ class LeaveRequest {
       leaveType: safeString(json['leave_type'], 'leave_type'),
       halfDayType: safeString(json['half_day_type'], 'half_day_type'),
       leaveSubType: safeString(json['leave_sub_type'], 'leave_sub_type'),
+      parsedStartDate: parseDateValue(json['start_date']),
+      parsedEndDate: parseDateValue(json['end_date']),
     );
+  }
+
+  static String _formatDisplayDate(DateTime date) {
+    return "${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}";
   }
 }
 

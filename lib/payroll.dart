@@ -162,7 +162,8 @@ class _PayrollPageState extends State<PayrollPage> {
                   ),
                   const SizedBox(height: 100),
                   Text(
-                    '© 2025 Payroll System (Dreamwarez)',
+                    // '© 2025 Payroll System (Dreamwarez)',
+                    '© ${DateTime.now().year} Payroll System (Dreamwarez)',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -182,7 +183,13 @@ class _PayrollPageState extends State<PayrollPage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         color: Colors.white,
-        boxShadow: [],
+        // boxShadow: [],
+                  boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+            ),
+          ],
         border: Border.all(color: Colors.grey.shade200),
       ),
       padding: const EdgeInsets.all(24),
@@ -224,9 +231,15 @@ class _PayrollPageState extends State<PayrollPage> {
     required LinearGradient gradient,
     required VoidCallback onPressed,
   }) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: AnimatedContainer(
+    // return GestureDetector(
+    //   onTap: onPressed,
+    //   child: AnimatedContainer(
+    return Material(
+  color: Colors.transparent,
+  child: InkWell(
+    borderRadius: BorderRadius.circular(16),
+    onTap: onPressed,
+    child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           gradient: gradient,
@@ -256,7 +269,7 @@ class _PayrollPageState extends State<PayrollPage> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildConfigDropdown(BuildContext context) {

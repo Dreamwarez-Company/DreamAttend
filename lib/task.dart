@@ -137,7 +137,8 @@ class _TaskState extends State<Task> {
       });
 
       showAppSnackBar(
-  message: 'Task updated to $newState',
+  
+  message: 'Task updated successfully.',
   type: AppSnackBarType.success,
 );
       return true;
@@ -403,7 +404,7 @@ class _TaskState extends State<Task> {
                     );
                   },
                   backgroundColor: const Color(0xFF073850),
-                  child: const Icon(Icons.add, color: Colors.orange),
+                  child: const Icon(Icons.add, color: Colors.white),
                 )
               : null,
       body: Column(
@@ -422,7 +423,17 @@ class _TaskState extends State<Task> {
                   child: Center(child: CircularProgressIndicator()))
               : _filteredTasks.isEmpty
                   ? const Expanded(
-                      child: Center(child: Text('No tasks available')))
+                      child: Center(child: 
+                      // Text('No tasks available')
+                                            Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.task_alt, size: 50, color: Colors.grey),
+                          SizedBox(height: 10),
+                          Text('No tasks available'),
+                        ],
+                      )
+                      ))
                   : Expanded(
                       child: ListView.builder(
                         itemCount: _filteredTasks.length,
@@ -937,7 +948,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         content: Text(
-          'Are you sure you want to Update "$status"',
+          // 'Are you sure you want to Update "$status"',
+          'Are you sure you want to update the task status to "$status"?',
           style: const TextStyle(fontSize: 16),
         ),
         shape: RoundedRectangleBorder(

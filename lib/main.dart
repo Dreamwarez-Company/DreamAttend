@@ -272,7 +272,7 @@ class _MyHomePageState extends State<MyHomePage>
       await prefs.setString('device_id', sessionData['device_id']);
       await prefs.setString('groups', jsonEncode(groups));
 
-      debugPrint('handleLogin: groups = $groups');
+      // debugPrint('handleLogin: groups = $groups');
 
       if (!mounted) return;
 
@@ -296,7 +296,7 @@ class _MyHomePageState extends State<MyHomePage>
       );
     } catch (e) {
       String errorMessage = _mapError(e.toString());
-      debugPrint('Login error: $errorMessage');
+      // debugPrint('Login error: $errorMessage');
       errorSnackBar('Error', errorMessage);
     } finally {
       if (mounted) {

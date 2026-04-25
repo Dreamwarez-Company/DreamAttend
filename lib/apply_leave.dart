@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '/models/leave_request.dart';
 import '/services/leave_service.dart';
 import 'widget/search_filter_bar.dart';
@@ -40,18 +41,23 @@ class _ApplyLeaveState extends State<ApplyLeave> {
   String? _tempFilterStatus = 'all';
 
   List<LeaveRequest> _leaveRequests = [];
-  List<LeaveRequest> _filteredLeaveRequests = [];
+  final ValueNotifier<List<LeaveRequest>> _filteredNotifier =
+      ValueNotifier<List<LeaveRequest>>([]);
+  Timer? _debounce;
+  Map<String, int>? _cachedStats;
+  final ValueNotifier<bool> _loadingNotifier = ValueNotifier(false);
 
   @override
   void initState() {
     super.initState();
     _fetchLeaveRequests();
-    _searchController.addListener(_filterRequests);
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_filterRequests);
+    _debounce?.cancel();
+    _filteredNotifier.dispose();
+    _loadingNotifier.dispose();
     _searchController.dispose();
     _reasonController.dispose();
     _startDateController.dispose();
@@ -60,6 +66,8 @@ class _ApplyLeaveState extends State<ApplyLeave> {
   }
 
   Future<void> _fetchLeaveRequests() async {
+    if (_isFetching) return;
+
     setState(() => _isFetching = true);
     try {
       final requests = await _leaveService.getLeaveRequests();
@@ -73,24 +81,30 @@ class _ApplyLeaveState extends State<ApplyLeave> {
       }
       // Sort by startDate descending (latest first)
       filteredRequests.sort((a, b) {
-        DateTime dateA = _parseDate(a.startDate);
-        DateTime dateB = _parseDate(b.startDate);
+        final dateA = a.parsedStartDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final dateB = b.parsedStartDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         return dateB.compareTo(dateA);
       });
       setState(() {
         _leaveRequests = filteredRequests;
-        _filteredLeaveRequests = _leaveRequests;
+        _updateStats();
       });
+      _filterRequests();
     } catch (e) {
       _showResultDialog('Error', 'Unable to load leave requests.', false);
     } finally {
+      if (!mounted) return;
+
       setState(() => _isFetching = false);
     }
   }
 
-  DateTime _parseDate(String dateStr) {
-    final parts = dateStr.split('-');
-    return DateTime.parse('${parts[2]}-${parts[1]}-${parts[0]}');
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) {
+      _debounce!.cancel();
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 300), _filterRequests);
   }
 
   Future<void> _selectDate(
@@ -186,7 +200,7 @@ class _ApplyLeaveState extends State<ApplyLeave> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    _loadingNotifier.value = true;
 
     try {
       final leaveRequest = LeaveRequest(
@@ -206,7 +220,7 @@ class _ApplyLeaveState extends State<ApplyLeave> {
     } catch (e) {
       _showResultDialog('Error', 'Failed to submit leave application.', false);
     } finally {
-      setState(() => _isLoading = false);
+      _loadingNotifier.value = false;
     }
   }
 
@@ -304,33 +318,22 @@ class _ApplyLeaveState extends State<ApplyLeave> {
   }
 
   void _filterRequests() {
-    setState(() {
-      final query = _searchController.text.trim().toLowerCase();
-      var filtered = _leaveRequests;
+    final query = _searchController.text.trim().toLowerCase();
+    Iterable<LeaveRequest> filtered = _leaveRequests;
 
-      if (_selectedFilterStatus != 'all') {
-        filtered = filtered
-            .where((request) => request.status == _selectedFilterStatus)
-            .toList();
-      }
+    if (_selectedFilterStatus != 'all') {
+      filtered = filtered.where(
+        (request) => request.status == _selectedFilterStatus,
+      );
+    }
 
-      if (query.isNotEmpty) {
-        filtered = filtered
-            .where(
-              (request) => request.employeeName.toLowerCase().contains(query),
-            )
-            .toList();
-      }
+    if (query.isNotEmpty) {
+      filtered = filtered.where(
+        (request) => request.employeeName.toLowerCase().contains(query),
+      );
+    }
 
-      // Sort filtered list by startDate descending (latest first)
-      filtered.sort((a, b) {
-        DateTime dateA = _parseDate(a.startDate);
-        DateTime dateB = _parseDate(b.startDate);
-        return dateB.compareTo(dateA);
-      });
-
-      _filteredLeaveRequests = filtered;
-    });
+    _filteredNotifier.value = List<LeaveRequest>.unmodifiable(filtered);
   }
 
   void _showFilterDialog() {
@@ -471,8 +474,8 @@ class _ApplyLeaveState extends State<ApplyLeave> {
                     _selectedFilterStatus = 'all';
                     _tempFilterStatus = 'all';
                     _showFilter = false;
-                    _filterRequests();
                   });
+                  _filterRequests();
                 },
                 child: const Text(
                   'Clear',
@@ -488,8 +491,8 @@ class _ApplyLeaveState extends State<ApplyLeave> {
                   setState(() {
                     _selectedFilterStatus = _tempFilterStatus;
                     _showFilter = false;
-                    _filterRequests();
                   });
+                  _filterRequests();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF073850),
@@ -523,6 +526,10 @@ class _ApplyLeaveState extends State<ApplyLeave> {
           (stats[request.status ?? 'submitted'] ?? 0) + 1;
     }
     return stats;
+  }
+
+  void _updateStats() {
+    _cachedStats = _calculateLeaveStats();
   }
 
   Widget _buildStatCircle(String label, double percent, Color color) {
@@ -568,7 +575,7 @@ class _ApplyLeaveState extends State<ApplyLeave> {
   }
 
   Widget _buildLeaveStats() {
-    final stats = _calculateLeaveStats();
+    final stats = _cachedStats ?? const {'submitted': 0, 'approved': 0, 'rejected': 0};
     final total = stats.values.fold(0, (sum, count) => sum + count);
     if (total == 0) {
       return const SizedBox.shrink();
@@ -614,6 +621,196 @@ class _ApplyLeaveState extends State<ApplyLeave> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLeaveList() {
+    return Expanded(
+      child: ValueListenableBuilder<List<LeaveRequest>>(
+        valueListenable: _filteredNotifier,
+        builder: (context, requests, _) {
+          if (requests.isEmpty) {
+            return Center(
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    widget.userRole == 'admin'
+                        ? 'No leave applications available.'
+                        : 'No leave applications found.',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      color: Color(0xFF073850),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16.0),
+            cacheExtent: 500,
+            itemCount: requests.length,
+            itemBuilder: (context, index) {
+              final request = requests[index];
+              return _buildLeaveCard(request);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLeaveCard(LeaveRequest request) {
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: _getStatusBorderColor(request.status),
+          width: 2,
+        ),
+      ),
+      child: ExpansionTile(
+        key: PageStorageKey(request.id ?? '${request.employeeName}-${request.startDate}'),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              request.employeeName,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                color: Color(0xFF073850),
+              ),
+            ),
+            Chip(
+              label: Text(
+                request.status?.toUpperCase() ?? 'SUBMITTED',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+              backgroundColor: _getStatusColor(request.status),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+          ],
+        ),
+        subtitle: Text(
+          request.leaveType == 'leave'
+              ? 'Leave (${request.leaveSubType == 'sick' ? 'Sick' : 'Casual'})'
+              : request.leaveType == 'wfh'
+                  ? 'Work From Home'
+                  : 'Half Day${request.halfDayType != null ? ' (${request.halfDayType == 'first_half' ? 'First Half' : 'Second Half'})' : ''}',
+          style: const TextStyle(
+            color: Color(0xFF073850),
+            fontSize: 14,
+          ),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildLeaveDetailRow('From:', request.startDate),
+                const SizedBox(height: 8),
+                _buildLeaveDetailRow('To:', request.endDate),
+                const SizedBox(height: 8),
+                _buildLeaveDetailRow('Reason:', request.reason, expanded: true),
+                if (widget.userRole == 'admin' &&
+                    request.status == 'submitted' &&
+                    request.id != null) ...[
+                  const Divider(height: 8, thickness: 1),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : () => _approveLeave(request.id!),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Approve',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : () => _rejectLeave(request.id!),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Reject',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeaveDetailRow(String label, String value, {bool expanded = false}) {
+    final valueWidget = Text(
+      value,
+      style: const TextStyle(
+        color: Color(0xFF073850),
+      ),
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF073850),
+            ),
+          ),
+        ),
+        if (expanded) Expanded(child: valueWidget) else valueWidget,
+      ],
     );
   }
 
@@ -839,34 +1036,39 @@ class _ApplyLeaveState extends State<ApplyLeave> {
                           style: TextStyle(fontSize: 16, color: Colors.white),
                         ),
                       ),
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _applyLeave,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF073850),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text(
-                                'Apply',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                ),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _loadingNotifier,
+                        builder: (context, isLoading, _) {
+                          return ElevatedButton(
+                            onPressed: isLoading ? null : _applyLeave,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF073850),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 12,
                               ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Apply',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -927,7 +1129,7 @@ class _ApplyLeaveState extends State<ApplyLeave> {
                 SearchFilterBar(
                   controller: _searchController,
                   hintText: 'Search by Employee name',
-                  onChanged: _filterRequests,
+                  onChanged: _onSearchChanged,
                   showFilter: _showFilter,
                   onFilterPressed: _showFilterDialog,
                 ),
@@ -935,251 +1137,7 @@ class _ApplyLeaveState extends State<ApplyLeave> {
                     ? const Expanded(
                         child: Center(child: CircularProgressIndicator()),
                       )
-                    : _filteredLeaveRequests.isEmpty
-                        ? Expanded(
-                            child: Center(
-                              child: Card(
-                                elevation: 4,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Text(
-                                    widget.userRole == 'admin'
-                                        ? 'No leave applications available.'
-                                        : 'No leave applications found.',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      color: Color(0xFF073850),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          )
-                        : Expanded(
-                            child: ListView.builder(
-                              padding: const EdgeInsets.all(16.0),
-                              itemCount: _filteredLeaveRequests.length,
-                              itemBuilder: (context, index) {
-                                final request = _filteredLeaveRequests[index];
-                                return Card(
-                                  elevation: 4,
-                                  margin:
-                                      const EdgeInsets.symmetric(vertical: 8),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: BorderSide(
-                                      color:
-                                          _getStatusBorderColor(request.status),
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: ExpansionTile(
-                                    title: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          request.employeeName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
-                                            color: Color(0xFF073850),
-                                          ),
-                                        ),
-                                        Chip(
-                                          label: Text(
-                                            request.status?.toUpperCase() ??
-                                                'SUBMITTED',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          backgroundColor:
-                                              _getStatusColor(request.status),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    subtitle: Text(
-                                      request.leaveType == 'leave'
-                                          ? 'Leave (${request.leaveSubType == 'sick' ? 'Sick' : 'Casual'})'
-                                          : request.leaveType == 'wfh'
-                                              ? 'Work From Home'
-                                              : 'Half Day${request.halfDayType != null ? ' (${request.halfDayType == 'first_half' ? 'First Half' : 'Second Half'})' : ''}',
-                                      style: const TextStyle(
-                                        color: Color(0xFF073850),
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(12.0),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                const SizedBox(
-                                                  width: 80,
-                                                  child: Text(
-                                                    'From:',
-                                                    style: TextStyle(
-                                                      color: Color(0xFF073850),
-                                                    ),
-                                                  ),
-                                                ),
-                                                Text(
-                                                  request.startDate,
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF073850),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                const SizedBox(
-                                                  width: 80,
-                                                  child: Text(
-                                                    'To:',
-                                                    style: TextStyle(
-                                                      color: Color(0xFF073850),
-                                                    ),
-                                                  ),
-                                                ),
-                                                Text(
-                                                  request.endDate,
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF073850),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                const SizedBox(
-                                                  width: 80,
-                                                  child: Text(
-                                                    'Reason:',
-                                                    style: TextStyle(
-                                                      color: Color(0xFF073850),
-                                                    ),
-                                                  ),
-                                                ),
-                                                Expanded(
-                                                  child: Text(
-                                                    request.reason,
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF073850),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            if (widget.userRole == 'admin' &&
-                                                request.status == 'submitted' &&
-                                                request.id != null) ...[
-                                              const Divider(
-                                                  height: 8, thickness: 1),
-                                              Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.end,
-                                                children: [
-                                                  ElevatedButton(
-                                                    onPressed: _isLoading
-                                                        ? null
-                                                        : () => _approveLeave(
-                                                              request.id!,
-                                                            ),
-                                                    style: ElevatedButton
-                                                        .styleFrom(
-                                                      backgroundColor:
-                                                          Colors.green,
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 4,
-                                                      ),
-                                                      shape:
-                                                          RoundedRectangleBorder(
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(8),
-                                                      ),
-                                                    ),
-                                                    child: const Text(
-                                                      'Approve',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  ElevatedButton(
-                                                    onPressed: _isLoading
-                                                        ? null
-                                                        : () => _rejectLeave(
-                                                              request.id!,
-                                                            ),
-                                                    style: ElevatedButton
-                                                        .styleFrom(
-                                                      backgroundColor:
-                                                          Colors.red,
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 4,
-                                                      ),
-                                                      shape:
-                                                          RoundedRectangleBorder(
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(8),
-                                                      ),
-                                                    ),
-                                                    child: const Text(
-                                                      'Reject',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
+                    : _buildLeaveList(),
               ],
             ),
       floatingActionButton: _showForm || widget.userRole != 'employee'

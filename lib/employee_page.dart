@@ -59,7 +59,8 @@ class _EmployeePageState extends State<EmployeePage> {
       });
     } catch (e) {
       if (!mounted) return;
-      errorSnackBar('Error', 'Failed to load employees: ${e.toString()}');
+      // errorSnackBar('Error', 'Failed to load employees: ${e.toString()}');
+      errorSnackBar('Error', 'Failed to load employees. Please try again.');
     } finally {
       if (!mounted) return;
       setState(() {
@@ -168,7 +169,7 @@ class _EmployeePageState extends State<EmployeePage> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'No profile image inserted',
+              'No profile image available',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
@@ -176,6 +177,25 @@ class _EmployeePageState extends State<EmployeePage> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmployeeAvatar(Employee employee) {
+    final initial = employee.name.trim().isNotEmpty
+        ? employee.name.trim()[0].toUpperCase()
+        : '?';
+
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: const Color(0xFF073850),
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
         ),
       ),
     );
@@ -211,11 +231,11 @@ class _EmployeePageState extends State<EmployeePage> {
       try {
         await _employeeService.archiveEmployee(employee.id);
         if (!mounted) return;
-        successSnackBar('Success', '${employee.name} deleted successfully!');
+        successSnackBar('Success', 'Employee deleted successfully.');
         await _fetchEmployees();
       } catch (e) {
         if (!mounted) return;
-        errorSnackBar('Error', 'Error: $e');
+        errorSnackBar('Error', 'Unable to delete employee. Please try again.');
       }
     }
   }
@@ -225,7 +245,7 @@ class _EmployeePageState extends State<EmployeePage> {
       context: context,
       builder: (dialogContext) {
         return Dialog(
-          insetPadding: EdgeInsets.zero,
+          insetPadding: const EdgeInsets.all(16),
           child: Scaffold(
             appBar: AppBar(
               title: Text(employee.name),
@@ -309,7 +329,13 @@ class _EmployeePageState extends State<EmployeePage> {
             ),
           ),
         ),
-        Expanded(child: Text(value)),
+        Expanded(
+          child: Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+        ),
       ],
     );
   }
@@ -341,7 +367,13 @@ class _EmployeePageState extends State<EmployeePage> {
             ),
           ),
         ),
-        Expanded(child: Text(value)),
+        Expanded(
+          child: Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+        ),
       ],
     );
   }
@@ -351,7 +383,7 @@ class _EmployeePageState extends State<EmployeePage> {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: const Text('Employees'),
+        title: const Text('Employee Directory'),
         backgroundColor: const Color.fromARGB(255, 7, 56, 80),
         actions: [
           IconButton(
@@ -360,8 +392,8 @@ class _EmployeePageState extends State<EmployeePage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             SearchFilterBar(
@@ -378,111 +410,137 @@ class _EmployeePageState extends State<EmployeePage> {
                 width: 2,
               ),
             ),
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredEmployees.isEmpty
-                    ? const Center(child: Text('No employees found'))
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _filteredEmployees.length,
-                        itemBuilder: (context, index) {
-                          final employee = _filteredEmployees[index];
-                          return Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.symmetric(vertical: 10),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () =>
-                                        _showEmployeeDetailsDialog(employee),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          employee.name,
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredEmployees.isEmpty
+                      ? const Center(child: Text('No employees found'))
+                      : ListView.builder(
+                          itemCount: _filteredEmployees.length,
+                          itemBuilder: (context, index) {
+                            final employee = _filteredEmployees[index];
+                            return Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(16),
+                                        onTap: () =>
+                                            _showEmployeeDetailsDialog(employee),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              _buildEmployeeAvatar(employee),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      employee.name,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    _buildEmployeeSummaryRow(
+                                                      'Job Title:',
+                                                      employee.jobTitle,
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    _buildEmployeeSummaryRow(
+                                                      'Mobile:',
+                                                      employee.mobile,
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    _buildEmployeeSummaryRow(
+                                                      'Email:',
+                                                      employee.email,
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    _buildEmployeeSummaryRow(
+                                                      'Role Type:',
+                                                      _roleTypeOptions.entries
+                                                          .firstWhere(
+                                                            (entry) =>
+                                                                entry.value ==
+                                                                employee
+                                                                    .roleType,
+                                                            orElse: () =>
+                                                                const MapEntry(
+                                                              'N/A',
+                                                              'N/A',
+                                                            ),
+                                                          )
+                                                      .key,
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    _buildEmployeeSummaryRow(
+                                                      'Gender:',
+                                                      _genderOptions.entries
+                                                          .firstWhere(
+                                                            (entry) =>
+                                                                entry.value ==
+                                                                employee.gender,
+                                                            orElse: () =>
+                                                                const MapEntry(
+                                                              'N/A',
+                                                              'N/A',
+                                                            ),
+                                                          )
+                                                          .key,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        const SizedBox(height: 8),
-                                        _buildEmployeeSummaryRow(
-                                          'Job Title:',
-                                          employee.jobTitle,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        _buildEmployeeSummaryRow(
-                                          'Mobile:',
-                                          employee.mobile,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        _buildEmployeeSummaryRow(
-                                          'Email:',
-                                          employee.email,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        _buildEmployeeSummaryRow(
-                                          'Role Type:',
-                                          _roleTypeOptions.entries
-                                              .firstWhere(
-                                                (entry) =>
-                                                    entry.value ==
-                                                    employee.roleType,
-                                                orElse: () =>
-                                                    const MapEntry(
-                                                  'N/A',
-                                                  'N/A',
-                                                ),
-                                              )
-                                              .key,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        _buildEmployeeSummaryRow(
-                                          'Gender:',
-                                          _genderOptions.entries
-                                              .firstWhere(
-                                                (entry) =>
-                                                    entry.value ==
-                                                    employee.gender,
-                                                orElse: () =>
-                                                    const MapEntry(
-                                                  'N/A',
-                                                  'N/A',
-                                                ),
-                                              )
-                                              .key,
-                                        ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        right: 8,
+                                      ),
+                                      child: IconButton(
+                                        icon: const Icon(
+                                          Icons.delete,
+                                          color: Colors.red,
+                                        ),
+                                        onPressed: () =>
+                                            _deleteEmployee(employee),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () => _deleteEmployee(employee),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                              ),
+                            );
+                          },
+                        ),
+            ),
           ],
         ),
       ),
